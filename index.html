@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Farmacias Chávez | Dashboard Logístico</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy:#0A0B0D;
+    --navy-2:#17181C;
+    --blue:#F2994A;
+    --blue-light:#F7B267;
+    --teal:#F2994A;
+    --amber:#F2C94C;
+    --violet:#EB5757;
+    --rose:#C0392B;
+    --green:#6FCF97;
+    --red:#EB5757;
+    --bg:#131417;
+    --card-bg:#1E2025;
+    --card-border:#2C2F36;
+    --text-primary:#F2F3F5;
+    --text-secondary:#9AA0AC;
+    --text-muted:#6B7280;
+    --header-h:64px;
+  }
+  html,body{background:var(--bg);height:100%;overflow:hidden;}
+  body{font-size:14px;color:var(--text-primary);}
+  ::-webkit-scrollbar{height:6px;width:6px;}
+  ::-webkit-scrollbar-thumb{background:#3A3D44;border-radius:8px;}
+  ::-webkit-scrollbar-thumb:hover{background:#4B4F58;}
+  .card{background:var(--card-bg);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.35),0 1px 1px rgba(0,0,0,.2);border:1px solid var(--card-border);}
+  .tab-btn{padding:.3rem .85rem;border-radius:8px;font-size:.76rem;font-weight:600;color:#7D828C;transition:.15s;}
+  .tab-btn.active{color:#fff;background:rgba(242,153,74,.16);}
+  .tab-btn:hover{color:#fff;}
+  .upload-btn{cursor:pointer;font-size:.68rem;font-weight:600;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#D7DAE0;padding:.32rem .6rem;border-radius:7px;transition:.15s;white-space:nowrap;}
+  .upload-btn:hover{background:rgba(255,255,255,.14);}
+  .upload-btn.loaded{background:rgba(111,207,151,.15);border-color:rgba(111,207,151,.35);color:#6FCF97;}
+  .export-btn{cursor:pointer;font-size:.68rem;font-weight:600;background:var(--blue);color:#151617;padding:.32rem .7rem;border-radius:7px;transition:.15s;}
+  .export-btn:hover{background:var(--blue-light);}
+  .chip{cursor:pointer;user-select:none;font-size:.66rem;font-weight:600;padding:.22rem .55rem;border-radius:999px;border:1px solid var(--card-border);color:var(--text-secondary);background:#26282F;transition:.12s;}
+  .chip.active{background:var(--blue);border-color:var(--blue);color:#151617;}
+  select, input[type=text]{border:1px solid var(--card-border);border-radius:7px;padding:.28rem .5rem;font-size:.72rem;background:#26282F;color:var(--text-primary);}
+  select:focus, input[type=text]:focus{outline:2px solid var(--blue);outline-offset:1px;}
+  select option{background:#26282F;color:var(--text-primary);}
+  ::placeholder{color:var(--text-muted);}
+  .kpi-label{font-size:.6rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-secondary);}
+  .kpi-value{font-size:1.15rem;font-weight:800;color:var(--text-primary);letter-spacing:-.01em;line-height:1.1;}
+  table.dash-table{width:100%;border-collapse:collapse;font-size:.68rem;}
+  table.dash-table thead th{position:sticky;top:0;background:#22242A;text-align:left;font-size:.6rem;text-transform:uppercase;letter-spacing:.02em;color:var(--text-secondary);font-weight:700;padding:.35rem .5rem;border-bottom:2px solid var(--card-border);cursor:pointer;white-space:nowrap;}
+  table.dash-table thead th:hover{color:#fff;}
+  table.dash-table tbody td{padding:.3rem .5rem;border-bottom:1px solid var(--card-border);color:var(--text-primary);white-space:nowrap;}
+  table.dash-table tbody tr:hover{background:#26282F;}
+  .table-scroll{height:100%;overflow:auto;border-radius:8px;}
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;padding:3rem 1rem;text-align:center;color:var(--text-secondary);height:100%;}
+  .chart-box{position:relative;height:100%;}
+  .mini-export{position:absolute;top:.3rem;right:.3rem;font-size:.58rem;font-weight:700;color:var(--text-secondary);background:#26282F;border:1px solid var(--card-border);padding:.12rem .4rem;border-radius:5px;cursor:pointer;z-index:5;}
+  .mini-export:hover{background:#2F3239;color:#fff;}
+  .badge-pos{color:var(--green);background:rgba(111,207,151,.14);border:1px solid rgba(111,207,151,.35);}
+  .badge-neg{color:var(--red);background:rgba(235,87,87,.14);border:1px solid rgba(235,87,87,.35);}
+  .badge{font-size:.62rem;font-weight:700;padding:.1rem .4rem;border-radius:999px;display:inline-flex;align-items:center;gap:.15rem;white-space:nowrap;}
+  .card-title{font-weight:700;font-size:.72rem;color:#D7DAE0;}
+
+  /* ---- Layout de aplicacion a pantalla completa (1920x1080) ---- */
+  #app{height:100vh;display:flex;flex-direction:column;}
+  header.app-header{flex:0 0 var(--header-h);}
+  main.app-main{flex:1 1 auto;min-height:0;padding:10px 12px;overflow-y:auto;}
+  .tab-panel{height:100%;min-height:0;}
+  .tab-panel.hidden{display:none;}
+
+  /* Tab1: sidebar + contenido */
+  .inv-grid{display:grid;grid-template-columns:280px 1fr;gap:10px;height:100%;min-height:0;}
+  .inv-main{display:grid;grid-template-rows:auto auto auto 1fr;gap:6px;min-height:0;}
+  .inv-charts{display:grid;grid-template-columns:1.4fr 1fr;gap:8px;min-height:0;}
+  .inv-charts-right{display:grid;grid-template-rows:1fr 1fr;gap:8px;min-height:0;}
+  .kpi-row-national{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .kpi-row-wh{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .kpi-row-wh .card{padding:.4rem .65rem;}
+  .kpi-row-wh .kpi-value{font-size:.92rem;}
+  .kpi-row-wh .kpi-label{font-size:.56rem;}
+
+  /* Sidebar proveedores */
+  .sidebar{display:flex;flex-direction:column;min-height:0;height:100%;}
+  .sidebar-list{flex:1 1 auto;overflow-y:auto;min-height:0;scroll-behavior:smooth;}
+  .ticker-item{padding:.4rem .55rem;border-bottom:1px solid var(--card-border);cursor:default;}
+  .ticker-item:hover{background:#26282F;}
+  .ticker-name{font-size:.68rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;}
+  .ticker-total{font-size:.68rem;font-weight:700;color:var(--text-primary);}
+  .ticker-sub{font-size:.58rem;color:var(--text-muted);margin-top:1px;}
+  .rank-dot{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:5px;background:#2C2F36;color:var(--text-secondary);font-size:.58rem;font-weight:800;flex:0 0 auto;}
+  .detail-panel{background:#26282F;border:1px solid var(--card-border);border-radius:8px;padding:.5rem .6rem;margin-bottom:6px;}
+
+  /* Tab2 */
+  .rec-grid{display:grid;grid-template-rows:auto auto auto 1fr;gap:8px;height:100%;min-height:0;}
+  .rec-charts{display:grid;grid-template-columns:1.3fr 1fr 1.3fr;gap:8px;}
+  .rec-tables{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-height:0;}
+
+  /* Overrides de utilidades Tailwind (asumen fondo claro por defecto) */
+  .text-slate-400{color:var(--text-secondary) !important;}
+  .text-slate-600{color:var(--text-secondary) !important;}
+  .text-slate-700{color:var(--text-primary) !important;}
+  .text-slate-800{color:var(--text-primary) !important;}
+
+  @media print{
+    html,body{overflow:visible !important;height:auto !important;background:#fff !important;}
+    #app{display:none !important;}
+    .print-report{display:block !important;}
+  }
+
+  /* =========================================================
+     REPORTE DE IMPRESION / PDF (tema claro, independiente de la UI)
+  ========================================================= */
+  .print-report{display:none;background:#fff;color:#1E293B;}
+  @page{margin:14mm;}
+  .pr-page{max-width:900px;margin:0 auto;font-family:ui-sans-serif,system-ui,sans-serif;}
+  .pr-header{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:3px solid #F2994A;padding-bottom:10px;margin-bottom:14px;}
+  .pr-header img{height:34px;width:auto;}
+  .pr-header .pr-title{font-size:15px;font-weight:800;color:#0F172A;}
+  .pr-header .pr-sub{font-size:10px;color:#64748B;}
+  .pr-header .pr-meta{text-align:right;font-size:9.5px;color:#64748B;}
+  .pr-section-title{font-size:13px;font-weight:800;color:#fff;background:#1E2025;padding:6px 10px;border-radius:6px;margin:22px 0 10px;page-break-after:avoid;}
+  .pr-section-title.pr-section-recuperacion{background:#1E2025;}
+  .pr-note{font-size:9.5px;color:#64748B;margin-bottom:10px;}
+  .pr-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+  .pr-kpi-grid.pr-kpi-3{grid-template-columns:repeat(3,1fr);}
+  .pr-kpi{border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;break-inside:avoid;}
+  .pr-kpi-label{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#64748B;}
+  .pr-kpi-value{font-size:15px;font-weight:800;color:#0F172A;margin-top:2px;}
+  .pr-kpi-growth{font-size:9px;font-weight:700;margin-top:3px;}
+  .pr-up{color:#DC2626;}
+  .pr-down{color:#059669;}
+  .pr-charts-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .pr-chart-box{border:1px solid #E2E8F0;border-radius:8px;padding:8px;break-inside:avoid;}
+  .pr-chart-box .pr-chart-title{font-size:10px;font-weight:700;color:#334155;margin-bottom:4px;}
+  .pr-chart-box canvas{width:100% !important;height:auto !important;display:block;}
+  .pr-table{width:100%;border-collapse:collapse;font-size:8.5px;margin-bottom:16px;}
+  .pr-table thead th{background:#1E2025;color:#fff;text-align:left;padding:5px 6px;font-size:8px;text-transform:uppercase;letter-spacing:.02em;}
+  .pr-table tbody td{padding:4px 6px;border-bottom:1px solid #EEF2F7;color:#1E293B;}
+  .pr-table tbody tr:nth-child(even){background:#F8FAFC;}
+  .pr-table-title{font-size:11px;font-weight:700;color:#0F172A;margin:14px 0 6px;page-break-after:avoid;}
+  .pr-page-break{page-break-before:always;}
+  .pr-footer{margin-top:18px;padding-top:8px;border-top:1px solid #E2E8F0;font-size:8px;color:#94A3B8;text-align:center;}
+</style>
+</head>
+<body class="text-slate-800">
+<div id="app">
+
+  <header class="app-header no-print flex items-center justify-between gap-3 px-4" style="background:linear-gradient(180deg,var(--navy),var(--navy-2));">
+    <div class="flex items-center gap-4 min-w-0">
+      <div class="flex items-center gap-2.5">
+        <img src="logo chavez 3.png" alt="Farmacias Chávez" class="h-8 w-auto flex-shrink-0">
+        <div class="min-w-0 border-l border-white/10 pl-2.5">
+          <h1 class="text-white text-[12px] font-bold leading-tight tracking-tight">Panel de Indicadores Logísticos</h1>
+          <p class="text-[10px] text-slate-400 truncate" id="lastUpdate">Sin datos cargados</p>
+        </div>
+      </div>
+      <nav class="flex gap-1">
+        <button data-tab="inventario" class="tab-btn active">Inventario de Almacenes</button>
+        <button data-tab="recuperacion" class="tab-btn">Indicador de Recuperación</button>
+      </nav>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <label class="upload-btn" id="lblInvUpload"><span id="lblInvText">📦 Inventario</span>
+        <input type="file" id="fileInventario" accept=".xlsx,.xls,.csv" class="hidden">
+      </label>
+      <label class="upload-btn" id="lblRecUpload"><span id="lblRecText">♻️ Recuperación</span>
+        <input type="file" id="fileRecuperacion" accept=".xlsx,.xls,.csv" class="hidden">
+      </label>
+      <button class="export-btn" id="btnExportPDF">⬇ PDF</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+
+    <section id="tab-inventario" class="tab-panel">
+
+      <div id="inv-empty" class="empty-state card">
+        <div class="text-3xl">📦</div>
+        <h2 class="text-base font-bold text-slate-700">Sin datos de inventario</h2>
+        <p class="max-w-md text-xs">Cargando automáticamente desde Google Drive...</p>
+      </div>
+
+      <div id="inv-content" class="hidden inv-grid">
+
+        <aside class="card p-3 sidebar">
+          <div class="flex items-center justify-between mb-2">
+            <span class="card-title">Ranking de Proveedores</span>
+            <span class="text-[9px] text-slate-400" id="providerCount"></span>
+          </div>
+          <input type="text" id="providerSearch" placeholder="🔎 Buscar proveedor…" class="w-full mb-2">
+          <div id="providerDetail"></div>
+          <div class="sidebar-list" id="providerList"></div>
+          <div class="text-[9px] text-slate-400 mt-1 flex items-center gap-1">
+            <span class="badge badge-neg">▲</span> Sube vs prom. 2m &nbsp;
+            <span class="badge badge-pos">▼</span> Baja vs prom. 2m
+          </div>
+        </aside>
+
+        <div class="inv-main">
+
+          <div class="card px-3 py-1.5 flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-1.5">
+              <span class="kpi-label">Año</span>
+              <select id="invYearSelect" class="min-w-[90px]"></select>
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="kpi-label">Almacenes</span>
+              <span class="chip active" data-wh="NDC SCZ">NDC SCZ</span>
+              <span class="chip active" data-wh="DEV PROV SCZ">DEV PROV SCZ</span>
+              <span class="chip active" data-wh="NDC LPZ">NDC LPZ</span>
+            </div>
+            <span class="text-[10px] text-slate-400 ml-auto" id="kpiMesActual"></span>
+          </div>
+
+          <div class="kpi-row-national">
+            <div class="card p-2.5" title="Importe nacional del mes vigente">
+              <div class="kpi-label">Importe Nacional</div>
+              <div class="kpi-value" id="kpiImporteNacional">—</div>
+            </div>
+            <div class="card p-2.5" title="Variación del mes vigente vs el promedio de dos meses atrás">
+              <div class="kpi-label">Crecimiento Nac. (2m)</div>
+              <div class="kpi-value flex items-center gap-1.5" id="kpiCrecimientoNacional">—</div>
+            </div>
+            <div class="card p-2.5" title="NDC SCZ + DEV PROV SCZ">
+              <div class="kpi-label">Regional Oriental</div>
+              <div class="kpi-value" id="kpiRegionalOriental">—</div>
+            </div>
+            <div class="card p-2.5" title="NDC LPZ">
+              <div class="kpi-label">Regional Occidental</div>
+              <div class="kpi-value" id="kpiRegionalOccidental">—</div>
+            </div>
+          </div>
+          <div class="kpi-row-wh">
+            <div class="card p-2.5 border-l-4" style="border-left-color:var(--blue)">
+              <div class="kpi-label">NDC SCZ</div>
+              <div class="flex items-center justify-between">
+                <div class="kpi-value" id="kpiNdcScz">—</div>
+                <div id="kpiNdcSczGrowth"></div>
+              </div>
+            </div>
+            <div class="card p-2.5 border-l-4" style="border-left-color:var(--amber)">
+              <div class="kpi-label">DEV PROV SCZ</div>
+              <div class="flex items-center justify-between">
+                <div class="kpi-value" id="kpiDevProv">—</div>
+                <div id="kpiDevProvGrowth"></div>
+              </div>
+            </div>
+            <div class="card p-2.5 border-l-4" style="border-left-color:var(--violet)">
+              <div class="kpi-label">NDC LPZ</div>
+              <div class="flex items-center justify-between">
+                <div class="kpi-value" id="kpiNdcLpz">—</div>
+                <div id="kpiNdcLpzGrowth"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="inv-charts">
+            <div class="card p-2.5 flex flex-col" style="min-height:0">
+              <div class="card-title mb-1" style="flex:0 0 auto">Evolución Nacional del Importe</div>
+              <div class="chart-box" style="flex:1 1 auto;min-height:0">
+                <button class="mini-export no-print" data-chart="chartNacional">PNG</button>
+                <canvas id="chartNacional"></canvas>
+              </div>
+            </div>
+            <div class="inv-charts-right">
+              <div class="card p-2.5 flex flex-col" style="min-height:0">
+              <div class="card-title mb-1" style="flex:0 0 auto">Evolución por Almacén</div>
+              <div class="chart-box" style="flex:1 1 auto;min-height:0">
+                  <button class="mini-export no-print" data-chart="chartAlmacenes">PNG</button>
+                  <canvas id="chartAlmacenes"></canvas>
+                </div>
+              </div>
+              <div class="card p-2.5 flex flex-col" style="min-height:0">
+              <div class="card-title mb-1" style="flex:0 0 auto">Oriental vs Occidental</div>
+              <div class="chart-box" style="flex:1 1 auto;min-height:0">
+                  <button class="mini-export no-print" data-chart="chartRegional">PNG</button>
+                  <canvas id="chartRegional"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-recuperacion" class="tab-panel hidden">
+
+      <div id="rec-empty" class="empty-state card">
+        <div class="text-3xl">♻️</div>
+        <h2 class="text-base font-bold text-slate-700">Sin datos de recuperación</h2>
+        <p class="max-w-md text-xs">Cargando automáticamente desde Google Drive...</p>
+      </div>
+
+      <div id="rec-content" class="hidden rec-grid">
+
+        <div class="card px-3 py-1.5 flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <span class="kpi-label">Año</span>
+            <select id="recYearSelect" class="min-w-[90px]"></select>
+          </div>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="kpi-label">Regional</span>
+            <span class="chip active" data-region="todas">Todas</span>
+            <span class="chip" data-region="oriental">Oriental</span>
+            <span class="chip" data-region="occidental">Occidental</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-2">
+          <div class="card p-2.5">
+            <div class="kpi-label">Total Recuperado</div>
+            <div class="kpi-value" id="kpiTotalRecuperado">—</div>
+          </div>
+          <div class="card p-2.5">
+            <div class="kpi-label">Total Recuperable</div>
+            <div class="kpi-value" id="kpiTotalRecuperable">—</div>
+          </div>
+          <div class="card p-2.5">
+            <div class="kpi-label">% Recuperación</div>
+            <div class="kpi-value" id="kpiPctRecuperacion">—</div>
+          </div>
+          <div class="card p-2.5">
+            <div class="kpi-label">No Recuperado</div>
+            <div class="kpi-value" id="kpiNoRecuperado">—</div>
+          </div>
+        </div>
+
+        <div class="rec-charts" style="height:230px">
+          <div class="card p-2.5 flex flex-col" style="min-height:0">
+              <div class="card-title mb-1" style="flex:0 0 auto">Oriental vs Occidental</div>
+              <div class="chart-box" style="flex:1 1 auto;min-height:0">
+              <button class="mini-export no-print" data-chart="chartOrienteOccidente">PNG</button>
+              <canvas id="chartOrienteOccidente"></canvas>
+            </div>
+          </div>
+          <div class="card p-2.5 flex flex-col" style="min-height:0">
+              <div class="card-title mb-1" style="flex:0 0 auto">% Recuperado</div>
+              <div class="chart-box" style="flex:1 1 auto;min-height:0">
+              <button class="mini-export no-print" data-chart="chartDonutRecuperado">PNG</button>
+              <canvas id="chartDonutRecuperado"></canvas>
+            </div>
+          </div>
+          <div class="card p-2.5 flex flex-col" style="min-height:0">
+              <div class="card-title mb-1" style="flex:0 0 auto">Evolución Temporal</div>
+              <div class="chart-box" style="flex:1 1 auto;min-height:0">
+              <button class="mini-export no-print" data-chart="chartEvolucionRecuperacion">PNG</button>
+              <canvas id="chartEvolucionRecuperacion"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="rec-tables">
+          <div class="card p-2.5 flex flex-col" style="min-height:0">
+            <div class="card-title mb-1">Regional Oriental — Recuperado vs No Recuperado (mensual)</div>
+            <div class="chart-box" style="flex:1 1 auto;min-height:0">
+              <button class="mini-export no-print" data-chart="chartCompOriental">PNG</button>
+              <canvas id="chartCompOriental"></canvas>
+            </div>
+          </div>
+
+          <div class="card p-2.5 flex flex-col" style="min-height:0">
+            <div class="card-title mb-1">Regional Occidental — Recuperado vs No Recuperado (mensual)</div>
+            <div class="chart-box" style="flex:1 1 auto;min-height:0">
+              <button class="mini-export no-print" data-chart="chartCompOccidental">PNG</button>
+              <canvas id="chartCompOccidental"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="printReport" class="print-report"></div>
+
+<script>
+/* =========================================================================
+   ESTADO GLOBAL
+========================================================================= */
+const state = {
+  inv: null,          // datos parseados del inventario
+  rec: null,          // datos parseados de recuperación
+  invFilters: { year: 'todos', warehouses: new Set(['NDC SCZ','DEV PROV SCZ','NDC LPZ']), search: '' },
+  recFilters: { year: 'todos', region: 'todas' },
+  sort: { top10: {key:'total', dir:-1}, oriental: {key:'anio', dir:1}, occidental:{key:'anio',dir:1} },
+  charts: {},
+  printCharts: {}
+};
+
+const COLORS = { blue:'#F2994A', amber:'#F2C94C', violet:'#EB5757', teal:'#F2994A', rose:'#C0392B', green:'#6FCF97', red:'#EB5757', slate:'#9AA0AC' };
+const MESES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// Tema oscuro global para todos los gráficos Chart.js
+Chart.defaults.color = '#9AA0AC';
+Chart.defaults.borderColor = '#2C2F36';
+Chart.defaults.font.family = "'Segoe UI', ui-sans-serif, system-ui, sans-serif";
+Chart.defaults.plugins.legend.labels.color = '#D7DAE0';
+Chart.defaults.plugins.tooltip.backgroundColor = '#1E2025';
+Chart.defaults.plugins.tooltip.titleColor = '#F2F3F5';
+Chart.defaults.plugins.tooltip.bodyColor = '#D7DAE0';
+Chart.defaults.plugins.tooltip.footerColor = '#9AA0AC';
+Chart.defaults.plugins.tooltip.borderColor = '#2C2F36';
+Chart.defaults.plugins.tooltip.borderWidth = 1;
+Chart.defaults.plugins.tooltip.padding = 8;
+Chart.defaults.plugins.tooltip.cornerRadius = 6;
+
+/* =========================================================================
+   HELPERS
+========================================================================= */
+function numOrZero(v){
+  if(v===null||v===undefined||v==='') return 0;
+  if(typeof v==='number') return isFinite(v)?v:0;
+  const p = parseFloat(String(v).replace(/,/g,'.'));
+  return isNaN(p)?0:p;
+}
+function fmtMoney(v){
+  if(v===null||v===undefined||isNaN(v)) return '—';
+  return 'Bs ' + new Intl.NumberFormat('es-BO',{maximumFractionDigits:0}).format(Math.round(v));
+}
+function fmtNum(v,dec=0){
+  if(v===null||v===undefined||isNaN(v)) return '—';
+  return new Intl.NumberFormat('es-BO',{minimumFractionDigits:dec,maximumFractionDigits:dec}).format(v);
+}
+function fmtPct(v,dec=1){
+  if(v===null||v===undefined||isNaN(v)) return '—';
+  return v.toFixed(dec)+'%';
+}
+function fmtMonthLabel(d){
+  if(!(d instanceof Date) || isNaN(d)) return '';
+  return MESES_CORTO[d.getMonth()] + ' ' + d.getFullYear();
+}
+function excelSerialToDate(n){
+  // fallback por si alguna celda llega como numero serial
+  const utcDays = Math.floor(n - 25569);
+  const utcValue = utcDays * 86400;
+  return new Date(utcValue * 1000);
+}
+function toDateSafe(v){
+  if(v instanceof Date) return v;
+  if(typeof v === 'number') return excelSerialToDate(v);
+  return null;
+}
+function findSheet(wb, candidates){
+  const names = wb.SheetNames;
+  for(const cand of candidates){
+    const hit = names.find(n => n.trim().toUpperCase() === cand.trim().toUpperCase());
+    if(hit) return wb.Sheets[hit];
+  }
+  // fallback: coincidencia parcial
+  for(const cand of candidates){
+    const hit = names.find(n => n.trim().toUpperCase().includes(cand.trim().toUpperCase()));
+    if(hit) return wb.Sheets[hit];
+  }
+  return null;
+}
+function sheetToArray(ws){
+  let range = { s:{r:0,c:0}, e:{r:0,c:0} };
+  if(ws && ws['!ref']){
+    const r = XLSX.utils.decode_range(ws['!ref']);
+    range = { s:{r:0,c:0}, e:{r:r.e.r, c:r.e.c} };
+  }
+  return XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:null, range: XLSX.utils.encode_range(range) });
+}
+
+/* =========================================================================
+   PARSEO: BD INVENTARIO DE ALMACENES
+========================================================================= */
+function parseWarehouseSheet(ws){
+  if(!ws) return null;
+  const data = sheetToArray(ws);
+  let headerIdx = -1;
+  for(let r=0;r<data.length;r++){
+    const v = data[r] ? data[r][1] : null;
+    if(v && String(v).trim().toUpperCase()==='LINEA'){ headerIdx = r; break; }
+  }
+  if(headerIdx < 0) return null;
+  const totalIdx = headerIdx - 2;
+  const header = data[headerIdx] || [];
+  let endCol = header.length;
+  for(let c=2;c<header.length;c++){
+    if(header[c]!==null && String(header[c]).trim()==='%'){ endCol = c; break; }
+  }
+  const startCol = 2;
+  const dates = [];
+  for(let c=startCol;c<endCol;c++){ dates.push(toDateSafe(header[c])); }
+
+  const totalRow = data[totalIdx] || [];
+  const total = [];
+  for(let c=startCol;c<endCol;c++){ total.push(numOrZero(totalRow[c])); }
+
+  const lines = [];
+  for(let r=headerIdx+1;r<data.length;r++){
+    const row = data[r];
+    if(!row) continue;
+    const name = row[1];
+    if(name===null || name===undefined || String(name).trim()==='') continue;
+    const values = [];
+    for(let c=startCol;c<endCol;c++){ values.push(numOrZero(row[c])); }
+    lines.push({ name: String(name).trim(), values });
+  }
+  return { dates, total, lines };
+}
+
+function mergeDateArrays(arrs){
+  const len = Math.max(0, ...arrs.map(a=>a.length));
+  const merged = [];
+  for(let i=0;i<len;i++){
+    let d = null;
+    for(const a of arrs){ if(a[i] instanceof Date){ d = a[i]; break; } }
+    merged.push(d);
+  }
+  return merged;
+}
+function sumSeries(arrs){
+  const len = Math.max(0, ...arrs.map(a=>a.length));
+  const out = new Array(len).fill(0);
+  arrs.forEach(a=>{ for(let i=0;i<len;i++){ out[i] += (a[i]||0); } });
+  return out;
+}
+function computeGrowthTwoMonths(series){
+  const n = series.length;
+  if(n<3) return { growthPct:null, current:series[n-1]??null, ref:null };
+  const current = series[n-1];
+  const ref = series[n-3];
+  if(!ref) return { growthPct:null, current, ref };
+  return { growthPct: (current-ref)/ref*100, current, ref };
+}
+
+function buildLineSeries(warehouses){
+  const map = new Map();
+  const whKeys = ['NDC SCZ','DEV PROV SCZ','NDC LPZ'];
+  whKeys.forEach(wh=>{
+    const lines = warehouses[wh].lines;
+    lines.forEach(line=>{
+      if(!map.has(line.name)){
+        map.set(line.name, { name: line.name, values: [], byWarehouse:{} });
+      }
+      const entry = map.get(line.name);
+      const len = line.values.length;
+      if(entry.values.length < len){
+        const diff = len - entry.values.length;
+        entry.values = new Array(diff).fill(0).concat(entry.values);
+      }
+      const offset = entry.values.length - len;
+      for(let i=0;i<len;i++){ entry.values[offset+i] += (line.values[i]||0); }
+      entry.byWarehouse[wh] = line.values[len-1] || 0;
+    });
+  });
+  const providers = Array.from(map.values()).map(p=>{
+    const n = p.values.length;
+    const current = n>0 ? p.values[n-1] : 0;
+    let avgPrev2 = null, growthPct = null;
+    if(n>=3){
+      avgPrev2 = (p.values[n-2] + p.values[n-3]) / 2;
+      growthPct = avgPrev2 !== 0 ? (current-avgPrev2)/avgPrev2*100 : null;
+    }
+    return { name:p.name, current, avgPrev2, growthPct, byWarehouse:p.byWarehouse };
+  });
+  providers.sort((a,b)=>b.current-a.current);
+  return providers;
+}
+
+function parseInventoryWorkbook(wb){
+  const wsNdcScz   = findSheet(wb, ['NDC SCZ']);
+  const wsDevProv  = findSheet(wb, ['DEV PROV SCZ']);
+  const wsNdcLpz   = findSheet(wb, ['NDC LPZ']);
+
+  const ndcScz  = parseWarehouseSheet(wsNdcScz);
+  const devProv = parseWarehouseSheet(wsDevProv);
+  const ndcLpz  = parseWarehouseSheet(wsNdcLpz);
+
+  if(!ndcScz && !devProv && !ndcLpz){
+    console.error('No se encontraron las hojas (NDC SCZ, DEV PROV SCZ, NDC LPZ).');
+  }
+
+  const warehouses = {
+    'NDC SCZ': ndcScz || {dates:[],total:[],lines:[]},
+    'DEV PROV SCZ': devProv || {dates:[],total:[],lines:[]},
+    'NDC LPZ': ndcLpz || {dates:[],total:[],lines:[]}
+  };
+
+  const dates = mergeDateArrays([warehouses['NDC SCZ'].dates, warehouses['DEV PROV SCZ'].dates, warehouses['NDC LPZ'].dates]);
+  const nationalSeries = sumSeries([warehouses['NDC SCZ'].total, warehouses['DEV PROV SCZ'].total, warehouses['NDC LPZ'].total]);
+  const orientalSeries = sumSeries([warehouses['NDC SCZ'].total, warehouses['DEV PROV SCZ'].total]);
+  const occidentalSeries = warehouses['NDC LPZ'].total.slice();
+
+  const providers = buildLineSeries(warehouses);
+  const years = Array.from(new Set(dates.filter(d=>d instanceof Date).map(d=>d.getFullYear()))).sort();
+
+  return { dates, warehouses, nationalSeries, orientalSeries, occidentalSeries, providers, years };
+}
+
+/* =========================================================================
+   PARSEO: BD INDICADOR RECUPERACION
+========================================================================= */
+function buildRecColMap(headerRow){
+  const map = {};
+  headerRow.forEach((h,i)=>{
+    if(h===null||h===undefined) return;
+    const s = String(h).trim().toUpperCase();
+    if(s==='AÑO' || s==='ANIO' || s==='AÑO ') map.anio=i;
+    else if(s==='MES') map.mes=i;
+    else if(s.includes('INGRESO DE SALAS')) map.ingreso=i;
+    else if(s.includes('EXCEPCIONAL')) map.excepcionales=i;
+    else if(s.includes('EGRESOS X NDC')) map.egresosNdc=i;
+    else if(s.includes('CAMBIO DE PRODUCTO')) map.egresosCambio=i;
+    else if(s.includes('RECUPERADO POR FACTURACI')) map.recuperadoFacturacion=i;
+    else if(s.includes('REVALORIZACI')) map.egresosRevalorizacion=i;
+    else if(s.includes('REDISTRIBUCI')) map.egresoRedistribucion=i;
+    else if(s.includes('TOTAL RECUPERADO')) map.totalCol=i;
+    else if(s.indexOf('%')===0) map.pctCol=i;
+  });
+  return map;
+}
+function extractRecTable(data, headerIdx){
+  const colMap = buildRecColMap(data[headerIdx] || []);
+  const rows = [];
+  if(colMap.anio===undefined) return rows;
+  for(let r=headerIdx+1;r<data.length;r++){
+    const row = data[r];
+    if(!row) break;
+    const anioVal = row[colMap.anio];
+    if(typeof anioVal !== 'number') break; // corta en fila TOTAL o vacía
+    const ingresoSalas = numOrZero(row[colMap.ingreso]);
+    const excepcionales = numOrZero(row[colMap.excepcionales]);
+    const egresosNdc = numOrZero(row[colMap.egresosNdc]);
+    const egresosCambio = numOrZero(row[colMap.egresosCambio]);
+    const recuperadoFacturacion = numOrZero(row[colMap.recuperadoFacturacion]);
+    const egresosRevalorizacion = (colMap.egresosRevalorizacion!==undefined) ? numOrZero(row[colMap.egresosRevalorizacion]) : 0;
+    const egresoRedistribucion = numOrZero(row[colMap.egresoRedistribucion]);
+    const totalRecuperado = egresosNdc + egresosCambio + recuperadoFacturacion + egresoRedistribucion - egresosRevalorizacion;
+    const noRecuperado = ingresoSalas - totalRecuperado;
+    const pct = ingresoSalas !== 0 ? (totalRecuperado/ingresoSalas*100) : 0;
+    rows.push({
+      anio: anioVal,
+      mes: String(row[colMap.mes]||'').trim(),
+      ingresoSalas, excepcionales, egresosNdc, egresosCambio, recuperadoFacturacion,
+      egresosRevalorizacion, egresoRedistribucion, totalRecuperado, noRecuperado, pct,
+      hasRevalorizacion: colMap.egresosRevalorizacion!==undefined
+    });
+  }
+  return rows;
+}
+function parseRecuperacionWorkbook(wb){
+  const ws = findSheet(wb, ["KPI´s ACTUALIZADO", "KPI'S ACTUALIZADO", "KPIS ACTUALIZADO", "KPI"]) || wb.Sheets[wb.SheetNames[0]];
+  const data = sheetToArray(ws);
+  const headerRows = [];
+  for(let r=0;r<data.length;r++){
+    const row = data[r];
+    if(row && row[0]!==null && String(row[0]).trim().toUpperCase()==='AÑO'){
+      headerRows.push(r);
+    }
+  }
+  const oriental = headerRows.length>0 ? extractRecTable(data, headerRows[0]) : [];
+  const occidental = headerRows.length>1 ? extractRecTable(data, headerRows[1]) : [];
+  const years = Array.from(new Set([...oriental, ...occidental].map(r=>r.anio))).sort();
+  return { oriental, occidental, years };
+}
+
+/* =========================================================================
+   RENDER: TAB INVENTARIO
+========================================================================= */
+function destroyChart(key){
+  if(state.charts[key]){ state.charts[key].destroy(); delete state.charts[key]; }
+}
+
+function populateInvFilters(){
+  const sel = document.getElementById('invYearSelect');
+  sel.innerHTML = '<option value="todos">Todos los años</option>' +
+    state.inv.years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  sel.value = 'todos';
+}
+
+function filteredMonthIndices(dates, year){
+  const idxs = [];
+  for(let i=0;i<dates.length;i++){
+    const d = dates[i];
+    if(!d) continue;
+    if(year==='todos' || d.getFullYear()===Number(year)) idxs.push(i);
+  }
+  return idxs;
+}
+
+function renderInventario(){
+  if(!state.inv) return;
+  document.getElementById('inv-empty').classList.add('hidden');
+  document.getElementById('inv-content').classList.remove('hidden');
+
+  const inv = state.inv;
+  const year = state.invFilters.year;
+  const idxs = filteredMonthIndices(inv.dates, year);
+
+  const nationalGrowth = computeGrowthTwoMonths(inv.nationalSeries);
+  const lastIdx = inv.nationalSeries.length-1;
+  document.getElementById('kpiImporteNacional').textContent = fmtMoney(inv.nationalSeries[lastIdx]);
+  document.getElementById('kpiMesActual').textContent = inv.dates[lastIdx] ? ('Al mes de ' + fmtMonthLabel(inv.dates[lastIdx])) : '';
+
+  const gc = document.getElementById('kpiCrecimientoNacional');
+  if(nationalGrowth.growthPct===null){
+    gc.innerHTML = '—';
+    gc.title = 'Datos insuficientes';
+  } else {
+    gc.innerHTML = growthBadgeHTML(nationalGrowth.growthPct);
+    const refIdx = inv.nationalSeries.length-3;
+    gc.title = `vs promedio 2 meses atrás (${fmtMonthLabel(inv.dates[refIdx])}): ${fmtMoney(nationalGrowth.ref)}`;
+  }
+
+  document.getElementById('kpiRegionalOriental').textContent = fmtMoney(inv.orientalSeries[inv.orientalSeries.length-1]);
+  document.getElementById('kpiRegionalOccidental').textContent = fmtMoney(inv.occidentalSeries[inv.occidentalSeries.length-1]);
+
+  const whMeta = [
+    {key:'NDC SCZ', valId:'kpiNdcScz', growId:'kpiNdcSczGrowth'},
+    {key:'DEV PROV SCZ', valId:'kpiDevProv', growId:'kpiDevProvGrowth'},
+    {key:'NDC LPZ', valId:'kpiNdcLpz', growId:'kpiNdcLpzGrowth'}
+  ];
+  whMeta.forEach(m=>{
+    const series = inv.warehouses[m.key].total;
+    const last = series[series.length-1];
+    document.getElementById(m.valId).textContent = fmtMoney(last);
+    const g = computeGrowthTwoMonths(series);
+    const el = document.getElementById(m.growId);
+    if(g.growthPct===null){ el.innerHTML = ''; el.title=''; }
+    else {
+      el.innerHTML = growthBadgeHTML(g.growthPct);
+      el.title = 'Variación vs promedio de 2 meses atrás';
+    }
+  });
+
+  destroyChart('nacional');
+  const labels = idxs.map(i=>fmtMonthLabel(inv.dates[i]));
+  const ctxN = document.getElementById('chartNacional').getContext('2d');
+  state.charts.nacional = new Chart(ctxN, {
+    type:'line',
+    data:{ labels, datasets:[{
+      label:'Importe Nacional',
+      data: idxs.map(i=>inv.nationalSeries[i]),
+      borderColor: COLORS.blue, backgroundColor:'rgba(242,153,74,.16)',
+      fill:true, tension:.3, pointRadius:2, borderWidth:2.5
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(c)=> fmtMoney(c.parsed.y) } } },
+      scales:{ y:{ ticks:{ callback:(v)=>fmtMoney(v) } } }
+    }
+  });
+
+  destroyChart('almacenes');
+  const activeWh = Array.from(state.invFilters.warehouses);
+  const whColors = { 'NDC SCZ':COLORS.blue, 'DEV PROV SCZ':COLORS.amber, 'NDC LPZ':COLORS.violet };
+  const datasetsWh = activeWh.map(k=>({
+    label:k,
+    data: idxs.map(i=> inv.warehouses[k].total[i] ?? null),
+    borderColor: whColors[k], backgroundColor: whColors[k],
+    tension:.3, pointRadius:2, borderWidth:2, fill:false
+  }));
+  const ctxWh = document.getElementById('chartAlmacenes').getContext('2d');
+  state.charts.almacenes = new Chart(ctxWh, {
+    type:'line',
+    data:{ labels, datasets: datasetsWh },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom'}, tooltip:{ callbacks:{ label:(c)=> `${c.dataset.label}: ${fmtMoney(c.parsed.y)}` } } },
+      scales:{ y:{ ticks:{ callback:(v)=>fmtMoney(v) } } }
+    }
+  });
+
+  destroyChart('regional');
+  const refIdx2 = Math.max(0, inv.orientalSeries.length-3);
+  const lastIdx2 = inv.orientalSeries.length-1;
+  const ctxReg = document.getElementById('chartRegional').getContext('2d');
+  state.charts.regional = new Chart(ctxReg, {
+    type:'bar',
+    data:{
+      labels:['Regional Oriental','Regional Occidental'],
+      datasets:[
+        { label: inv.dates[refIdx2] ? fmtMonthLabel(inv.dates[refIdx2]) : 'Referencia', data:[inv.orientalSeries[refIdx2], inv.occidentalSeries[refIdx2]], backgroundColor:'#3A3D44', borderRadius:6 },
+        { label: inv.dates[lastIdx2] ? fmtMonthLabel(inv.dates[lastIdx2]) : 'Actual', data:[inv.orientalSeries[lastIdx2], inv.occidentalSeries[lastIdx2]], backgroundColor: COLORS.blue, borderRadius:6 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom'}, tooltip:{ callbacks:{ label:(c)=> `${c.dataset.label}: ${fmtMoney(c.parsed.y)}` } } },
+      scales:{ y:{ ticks:{ callback:(v)=>fmtMoney(v) } } }
+    }
+  });
+
+  renderProviderSidebar();
+}
+
+const MAX_TICKER_ITEMS = 40;
+let autoScrollTimer = null;
+
+function growthBadgeHTML(growthPct){
+  if(growthPct===null || growthPct===undefined) return '<span class="badge" style="color:var(--text-secondary);background:#26282F;border:1px solid var(--card-border)">—</span>';
+  const up = growthPct >= 0;
+  const cls = up ? 'badge-neg' : 'badge-pos';
+  return `<span class="badge ${cls}">${up?'▲':'▼'} ${fmtPct(Math.abs(growthPct))}</span>`;
+}
+
+function providerTooltip(p){
+  const wh = p.byWarehouse;
+  return `NDC SCZ: ${fmtMoney(wh['NDC SCZ']||0)} | DEV PROV SCZ: ${fmtMoney(wh['DEV PROV SCZ']||0)} | NDC LPZ: ${fmtMoney(wh['NDC LPZ']||0)}`;
+}
+
+function renderProviderDetail(p){
+  const box = document.getElementById('providerDetail');
+  if(!p){ box.innerHTML=''; return; }
+  const wh = p.byWarehouse;
+  box.innerHTML = `
+    <div class="detail-panel">
+      <div class="flex items-center justify-between gap-2">
+        <span class="ticker-name" style="max-width:150px">${p.name}</span>
+        ${growthBadgeHTML(p.growthPct)}
+      </div>
+      <div class="grid grid-cols-3 gap-1 mt-1.5 text-center">
+        <div><div class="text-[8px] text-slate-400">NDC SCZ</div><div class="text-[10px] font-bold">${fmtMoney(wh['NDC SCZ']||0)}</div></div>
+        <div><div class="text-[8px] text-slate-400">DEV PROV</div><div class="text-[10px] font-bold">${fmtMoney(wh['DEV PROV SCZ']||0)}</div></div>
+        <div><div class="text-[8px] text-slate-400">NDC LPZ</div><div class="text-[10px] font-bold">${fmtMoney(wh['NDC LPZ']||0)}</div></div>
+      </div>
+      <div class="flex items-center justify-between mt-1.5 pt-1.5" style="border-top:1px dashed #2C2F36">
+        <span class="text-[9px] text-slate-400">Total actual</span>
+        <span class="ticker-total">${fmtMoney(p.current)}</span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-[9px] text-slate-400">Prom. 2 meses atrás</span>
+        <span class="text-[10px] font-semibold text-slate-600">${fmtMoney(p.avgPrev2)}</span>
+      </div>
+    </div>`;
+}
+
+function renderProviderSidebar(){
+  const inv = state.inv;
+  if(!inv) return;
+  const listEl = document.getElementById('providerList');
+  const search = state.invFilters.search.trim().toUpperCase();
+  document.getElementById('providerCount').textContent = inv.providers.length + ' líneas';
+
+  let items = inv.providers;
+  if(search){
+    items = items.filter(p=>p.name.toUpperCase().includes(search));
+    renderProviderDetail(items[0] || null);
+    stopAutoScroll();
+  } else {
+    renderProviderDetail(null);
+    items = items.slice(0, MAX_TICKER_ITEMS);
+  }
+
+  listEl.innerHTML = items.map((p,i)=>`
+    <div class="ticker-item" title="${providerTooltip(p)}">
+      <div class="flex items-center justify-between gap-1.5">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <span class="rank-dot">${i+1}</span>
+          <span class="ticker-name">${p.name}</span>
+        </div>
+        <span class="ticker-total">${fmtMoney(p.current)}</span>
+      </div>
+      <div class="flex items-center justify-between mt-0.5">
+        <span class="ticker-sub">SCZ ${fmtNum(p.byWarehouse['NDC SCZ']||0)} · DEV ${fmtNum(p.byWarehouse['DEV PROV SCZ']||0)} · LPZ ${fmtNum(p.byWarehouse['NDC LPZ']||0)}</span>
+        ${growthBadgeHTML(p.growthPct)}
+      </div>
+    </div>`).join('') || '<div class="p-3 text-center text-slate-400 text-xs">Sin resultados</div>';
+
+  if(!search) startAutoScroll();
+}
+
+function startAutoScroll(){
+  stopAutoScroll();
+  const listEl = document.getElementById('providerList');
+  if(!listEl) return;
+  autoScrollTimer = setInterval(()=>{
+    if(listEl.matches(':hover')) return;
+    if(listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 1){
+      listEl.scrollTop = 0;
+    } else {
+      listEl.scrollTop += 1;
+    }
+  }, 60);
+}
+function stopAutoScroll(){
+  if(autoScrollTimer){ clearInterval(autoScrollTimer); autoScrollTimer = null; }
+}
+
+/* =========================================================================
+   RENDER: TAB RECUPERACION
+========================================================================= */
+function populateRecFilters(){
+  const sel = document.getElementById('recYearSelect');
+  sel.innerHTML = '<option value="todos">Todos los años</option>' +
+    state.rec.years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  sel.value = 'todos';
+}
+
+function filterRecRows(rows, year){
+  if(year==='todos') return rows;
+  return rows.filter(r=>r.anio===Number(year));
+}
+
+function computeRecKPIs(rows){
+  const totalRecuperado = rows.reduce((s,r)=>s+r.totalRecuperado,0);
+  const totalRecuperable = rows.reduce((s,r)=>s+r.ingresoSalas,0);
+  const noRecuperado = totalRecuperable - totalRecuperado;
+  const pct = totalRecuperable!==0 ? (totalRecuperado/totalRecuperable*100) : 0;
+  return { totalRecuperado, totalRecuperable, noRecuperado, pct };
+}
+
+function renderRecuperacion(){
+  if(!state.rec) return;
+  document.getElementById('rec-empty').classList.add('hidden');
+  document.getElementById('rec-content').classList.remove('hidden');
+
+  const rec = state.rec;
+  const year = state.recFilters.year;
+  const region = state.recFilters.region;
+
+  const orientalF = filterRecRows(rec.oriental, year);
+  const occidentalF = filterRecRows(rec.occidental, year);
+
+  let rowsForKpi;
+  if(region==='oriental') rowsForKpi = orientalF;
+  else if(region==='occidental') rowsForKpi = occidentalF;
+  else rowsForKpi = [...orientalF, ...occidentalF];
+
+  const k = computeRecKPIs(rowsForKpi);
+  document.getElementById('kpiTotalRecuperado').textContent = fmtMoney(k.totalRecuperado);
+  document.getElementById('kpiTotalRecuperable').textContent = fmtMoney(k.totalRecuperable);
+  document.getElementById('kpiPctRecuperacion').textContent = fmtPct(k.pct);
+  document.getElementById('kpiNoRecuperado').textContent = fmtMoney(k.noRecuperado);
+
+  const kOriental = computeRecKPIs(orientalF);
+  const kOccidental = computeRecKPIs(occidentalF);
+  destroyChart('orienteOccidente');
+  const ctxBar = document.getElementById('chartOrienteOccidente').getContext('2d');
+  state.charts.orienteOccidente = new Chart(ctxBar, {
+    type:'bar',
+    data:{
+      labels:['Recuperable','Recuperado','No Recuperado'],
+      datasets:[
+        { label:'Regional Oriental', data:[kOriental.totalRecuperable, kOriental.totalRecuperado, kOriental.noRecuperado], backgroundColor: COLORS.blue, borderRadius:6 },
+        { label:'Regional Occidental', data:[kOccidental.totalRecuperable, kOccidental.totalRecuperado, kOccidental.noRecuperado], backgroundColor: COLORS.violet, borderRadius:6 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom'}, tooltip:{ callbacks:{ label:(c)=> `${c.dataset.label}: ${fmtMoney(c.parsed.y)}` } } },
+      scales:{ y:{ ticks:{ callback:(v)=>fmtMoney(v) } } }
+    }
+  });
+
+  destroyChart('donut');
+  const ctxDonut = document.getElementById('chartDonutRecuperado').getContext('2d');
+  state.charts.donut = new Chart(ctxDonut, {
+    type:'doughnut',
+    data:{
+      labels:['Recuperado','No Recuperado'],
+      datasets:[{ data:[Math.max(k.totalRecuperado,0), Math.max(k.noRecuperado,0)], backgroundColor:[COLORS.green, '#3A3D44'], borderWidth:0 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'70%',
+      plugins:{ legend:{position:'bottom'}, tooltip:{ callbacks:{ label:(c)=> `${c.label}: ${fmtMoney(c.parsed)}` } } }
+    },
+    plugins:[{
+      id:'centerText',
+      afterDraw(chart){
+        const {ctx, chartArea} = chart;
+        ctx.save();
+        const cx = (chartArea.left+chartArea.right)/2;
+        const cy = (chartArea.top+chartArea.bottom)/2;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.font='700 20px sans-serif'; ctx.fillStyle='#F2F3F5';
+        ctx.fillText(fmtPct(k.pct), cx, cy-4);
+        ctx.font='600 11px sans-serif'; ctx.fillStyle='#9AA0AC';
+        ctx.fillText('Recuperación', cx, cy+16);
+        ctx.restore();
+      }
+    }]
+  });
+
+  const orientalAll = filterRecRows(rec.oriental, year);
+  const occidentalAll = filterRecRows(rec.occidental, year);
+  const periodSet = new Map();
+  function keyOf(r){ return r.anio*12 + MESES.indexOf(r.mes.toUpperCase()); }
+  orientalAll.forEach(r=>periodSet.set(keyOf(r), {anio:r.anio, mes:r.mes}));
+  occidentalAll.forEach(r=>periodSet.set(keyOf(r), {anio:r.anio, mes:r.mes}));
+  const periods = Array.from(periodSet.keys()).sort((a,b)=>a-b);
+  const evLabels = periods.map(p=>{ const info=periodSet.get(p); const idx=MESES.indexOf(info.mes.toUpperCase()); return `${MESES_CORTO[idx]} ${info.anio}`; });
+  const orientalMap = new Map(orientalAll.map(r=>[keyOf(r), r.totalRecuperado]));
+  const occidentalMap = new Map(occidentalAll.map(r=>[keyOf(r), r.totalRecuperado]));
+  destroyChart('evolucion');
+  const ctxEv = document.getElementById('chartEvolucionRecuperacion').getContext('2d');
+  state.charts.evolucion = new Chart(ctxEv, {
+    type:'line',
+    data:{
+      labels: evLabels,
+      datasets:[
+        { label:'Regional Oriental', data: periods.map(p=>orientalMap.has(p)?orientalMap.get(p):null), borderColor: COLORS.blue, backgroundColor:'rgba(242,153,74,.12)', tension:.3, pointRadius:2, borderWidth:2 },
+        { label:'Regional Occidental', data: periods.map(p=>occidentalMap.has(p)?occidentalMap.get(p):null), borderColor: COLORS.violet, backgroundColor:'rgba(235,87,87,.12)', tension:.3, pointRadius:2, borderWidth:2 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom'}, tooltip:{ callbacks:{ label:(c)=> `${c.dataset.label}: ${fmtMoney(c.parsed.y)}` } } },
+      scales:{ y:{ ticks:{ callback:(v)=>fmtMoney(v) } } }
+    }
+  });
+
+  renderRecCompositionChart('chartCompOriental', 'compOriental', orientalF, COLORS.blue);
+  renderRecCompositionChart('chartCompOccidental', 'compOccidental', occidentalF, COLORS.violet);
+}
+
+function renderRecCompositionChart(canvasId, chartKey, rows, accentColor){
+  const sorted = rows.slice().sort((a,b)=>{
+    const ka = a.anio*12+MESES.indexOf(a.mes.toUpperCase());
+    const kb = b.anio*12+MESES.indexOf(b.mes.toUpperCase());
+    return ka-kb;
+  });
+  const labels = sorted.map(r=>{
+    const idx = MESES.indexOf(r.mes.toUpperCase());
+    return `${MESES_CORTO[idx]} ${r.anio}`;
+  });
+  destroyChart(chartKey);
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  state.charts[chartKey] = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'Recuperado', data: sorted.map(r=>r.totalRecuperado), backgroundColor: COLORS.green, stack:'s', borderRadius:3 },
+        { label:'No Recuperado', data: sorted.map(r=>Math.max(r.noRecuperado,0)), backgroundColor:'#3A3D44', stack:'s', borderRadius:3 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'bottom', labels:{boxWidth:10, font:{size:9}}},
+        tooltip:{ callbacks:{
+          label:(c)=> `${c.dataset.label}: ${fmtMoney(c.parsed.y)}`,
+          afterBody:(items)=>{
+            const r = sorted[items[0].dataIndex];
+            const lines = [
+              `% Recuperación: ${fmtPct(r.pct)}`,
+              `Recuperable: ${fmtMoney(r.ingresoSalas)}`,
+              `Egr. NDC: ${fmtMoney(r.egresosNdc)}`,
+              `Egr. Cambio Prod.: ${fmtMoney(r.egresosCambio)}`,
+              `Recup. Facturación: ${fmtMoney(r.recuperadoFacturacion)}`
+            ];
+            if(r.hasRevalorizacion) lines.push(`Egr. Revalorización: ${fmtMoney(r.egresosRevalorizacion)}`);
+            lines.push(`Egr. Redistribución: ${fmtMoney(r.egresoRedistribucion)}`);
+            return lines;
+          }
+        } }
+      },
+      scales:{
+        x:{ stacked:true, ticks:{ font:{size:9} } },
+        y:{ stacked:true, ticks:{ callback:(v)=>fmtMoney(v), font:{size:9} } }
+      }
+    }
+  });
+}
+
+/* =========================================================================
+   CARGA DE ARCHIVOS Y CONEXIÓN A GOOGLE DRIVE
+========================================================================= */
+
+// ENLACES PÚBLICOS DE DRIVE
+const URL_INVENTARIO = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRIyxS6Vzc-Js3DO8u1ejcteLAzk35zlv4YbVBdJmYKhCxsIg90UGaCd18BEjtrmC-Q2E-lbirT7hz8/pub?output=xlsx';
+const URL_RECUPERACION = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkaAknUBypS0ovVuKqBGK76wDgBeTwGfZEB6uTvUYY77By-F-_8suI9ozH1JTlrMzPy3g3QRib-KWG/pub?output=xlsx';
+
+// Función para descargar y leer directamente un archivo publicado
+async function fetchWorkbookFromUrl(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('No se pudo conectar al enlace de Drive');
+  const arrayBuffer = await response.arrayBuffer();
+  const data = new Uint8Array(arrayBuffer);
+  return XLSX.read(data, { type: 'array', cellDates: true });
+}
+
+// Lógica de sincronización inicial
+async function initDriveSync() {
+  document.getElementById('lastUpdate').textContent = 'Sincronizando con Google Drive...';
+  document.getElementById('lblInvText').textContent = '⏳ Conectando...';
+  document.getElementById('lblRecText').textContent = '⏳ Conectando...';
+
+  try {
+    // Petición simultánea de ambos archivos
+    const [wbInv, wbRec] = await Promise.all([
+      fetchWorkbookFromUrl(URL_INVENTARIO),
+      fetchWorkbookFromUrl(URL_RECUPERACION)
+    ]);
+
+    // Parseo y renderizado de Inventario
+    state.inv = parseInventoryWorkbook(wbInv);
+    document.getElementById('lblInvUpload').classList.add('loaded');
+    document.getElementById('lblInvText').textContent = '✅ Inventario (Drive)';
+    populateInvFilters();
+    renderInventario();
+
+    // Parseo y renderizado de Recuperación
+    state.rec = parseRecuperacionWorkbook(wbRec);
+    document.getElementById('lblRecUpload').classList.add('loaded');
+    document.getElementById('lblRecText').textContent = '✅ Recuperación (Drive)';
+    populateRecFilters();
+    renderRecuperacion();
+
+    updateLastUpdate();
+  } catch (err) {
+    console.error('Error durante la sincronización automática:', err);
+    document.getElementById('lastUpdate').textContent = 'Error de conexión con Google Drive';
+    alert('Hubo un problema al cargar los datos. Puedes usar los botones superiores para cargar los archivos manualmente.');
+  }
+}
+
+// Disparador automático al cargar la página web
+window.addEventListener('DOMContentLoaded', initDriveSync);
+
+// Plan de respaldo: Carga de archivos manual a través de inputs
+function readFileAsWorkbook(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type:'array', cellDates:true });
+        resolve(wb);
+      }catch(err){ reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function updateLastUpdate(){
+  const el = document.getElementById('lastUpdate');
+  const now = new Date();
+  el.textContent = 'Última actualización: ' + now.toLocaleString('es-BO');
+}
+
+document.getElementById('fileInventario').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const wb = await readFileAsWorkbook(file);
+    state.inv = parseInventoryWorkbook(wbInv);
+    document.getElementById('lblInvUpload').classList.add('loaded');
+    document.getElementById('lblInvText').textContent = '✅ ' + file.name;
+    populateInvFilters();
+    renderInventario();
+    updateLastUpdate();
+  }catch(err){
+    console.error(err);
+    alert('Error al leer el archivo de Inventario: ' + err.message);
+  }
+});
+
+document.getElementById('fileRecuperacion').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const wb = await readFileAsWorkbook(file);
+    state.rec = parseRecuperacionWorkbook(wb);
+    document.getElementById('lblRecUpload').classList.add('loaded');
+    document.getElementById('lblRecText').textContent = '✅ ' + file.name;
+    populateRecFilters();
+    renderRecuperacion();
+    updateLastUpdate();
+  }catch(err){
+    console.error(err);
+    alert('Error al leer el archivo de Recuperación: ' + err.message);
+  }
+});
+
+/* =========================================================================
+   NAVEGACION / FILTROS / EVENTOS
+========================================================================= */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('tab-inventario').classList.toggle('hidden', tab!=='inventario');
+    document.getElementById('tab-recuperacion').classList.toggle('hidden', tab!=='recuperacion');
+    if(tab==='inventario' && state.inv && !state.invFilters.search) startAutoScroll();
+    else stopAutoScroll();
+  });
+});
+
+document.getElementById('invYearSelect').addEventListener('change', (e)=>{
+  state.invFilters.year = e.target.value;
+  renderInventario();
+});
+document.getElementById('providerSearch').addEventListener('input', (e)=>{
+  state.invFilters.search = e.target.value;
+  if(state.inv) renderProviderSidebar();
+});
+document.querySelectorAll('#tab-inventario .chip[data-wh]').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    const wh = chip.dataset.wh;
+    chip.classList.toggle('active');
+    if(chip.classList.contains('active')) state.invFilters.warehouses.add(wh);
+    else state.invFilters.warehouses.delete(wh);
+    if(state.inv) renderInventario();
+  });
+});
+
+document.getElementById('recYearSelect').addEventListener('change', (e)=>{
+  state.recFilters.year = e.target.value;
+  renderRecuperacion();
+});
+document.querySelectorAll('#tab-recuperacion .chip[data-region]').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#tab-recuperacion .chip[data-region]').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    state.recFilters.region = chip.dataset.region;
+    renderRecuperacion();
+  });
+});
+
+document.querySelectorAll('.mini-export').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const map = {
+      chartNacional:'nacional', chartAlmacenes:'almacenes', chartRegional:'regional',
+      chartOrienteOccidente:'orienteOccidente', chartDonutRecuperado:'donut', chartEvolucionRecuperacion:'evolucion',
+      chartCompOriental:'compOriental', chartCompOccidental:'compOccidental'
+    };
+    const canvasId = map[btn.dataset.chart];
+    const chart = state.charts[canvasId];
+    if(!chart) return;
+    const link = document.createElement('a');
+    link.href = chart.toBase64Image('image/png',1);
+    link.download = btn.dataset.chart + '.png';
+    link.click();
+  });
+});
+
+/* =========================================================================
+   REPORTE DE IMPRESION / PDF (independiente del layout de pantalla)
+========================================================================= */
+function prFmtGrowth(growthPct, invertido){
+  if(growthPct===null || growthPct===undefined) return '<span style="color:#94A3B8">Sin datos suficientes</span>';
+  const up = growthPct >= 0;
+  const cls = invertido ? (up ? 'pr-up' : 'pr-down') : (up ? 'pr-down' : 'pr-up');
+  return `<span class="${cls}">${up?'▲':'▼'} ${fmtPct(Math.abs(growthPct))}</span>`;
+}
+
+function destroyPrintCharts(){
+  Object.values(state.printCharts).forEach(c=>{ try{ c.destroy(); }catch(e){} });
+  state.printCharts = {};
+}
+
+function makeLightChart(canvasId, config){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return null;
+  const chart = new Chart(canvas.getContext('2d'), config);
+  state.printCharts[canvasId] = chart;
+  return chart;
+}
+
+const PR_LIGHT_GRID = '#EEF2F7';
+const PR_LIGHT_TICK = '#64748B';
+const PR_LIGHT_LEGEND = { labels:{ color:'#334155', font:{size:9}, boxWidth:10 }, position:'bottom' };
+
+function buildPrintReport(){
+  destroyPrintCharts();
+  const box = document.getElementById('printReport');
+  const logoSrc = document.querySelector('.app-header img') ? document.querySelector('.app-header img').src : '';
+  const now = new Date().toLocaleString('es-BO');
+
+  let html = `<div class="pr-page">
+    <div class="pr-header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        ${logoSrc ? `<img src="${logoSrc}" alt="Farmacias Chávez">` : ''}
+        <div>
+          <div class="pr-title">Reporte de Indicadores Logísticos</div>
+          <div class="pr-sub">Farmacias Chávez</div>
+        </div>
+      </div>
+      <div class="pr-meta">Generado: ${now}<br>Filtros: Inventario año ${state.invFilters.year} · Recuperación año ${state.recFilters.year} / ${state.recFilters.region}</div>
+    </div>`;
+
+  if(!state.inv && !state.rec){
+    html += `<p style="text-align:center;color:#94A3B8;padding:40px 0;">No hay datos cargados. Cargue los archivos de Inventario y/o Recuperación antes de exportar.</p></div>`;
+    box.innerHTML = html;
+    return;
+  }
+
+  if(state.inv){
+    html += buildPrintInventarioSection();
+  }
+  if(state.rec){
+    html += (state.inv ? '<div class="pr-page-break"></div>' : '') + buildPrintRecuperacionSection();
+  }
+
+  html += `<div class="pr-footer">Farmacias Chávez — Dashboard Logístico · Reporte generado automáticamente a partir de los archivos Excel cargados</div></div>`;
+  box.innerHTML = html;
+
+  if(state.inv) renderPrintInventarioCharts();
+  if(state.rec) renderPrintRecuperacionCharts();
+}
+
+function buildPrintInventarioSection(){
+  const inv = state.inv;
+  const lastIdx = inv.nationalSeries.length-1;
+  const nationalGrowth = computeGrowthTwoMonths(inv.nationalSeries);
+  const refIdx = inv.nationalSeries.length-3;
+
+  let kpis = `<div class="pr-kpi-grid">
+    <div class="pr-kpi"><div class="pr-kpi-label">Importe Nacional</div><div class="pr-kpi-value">${fmtMoney(inv.nationalSeries[lastIdx])}</div><div class="pr-kpi-growth" style="color:#94A3B8">Al mes de ${fmtMonthLabel(inv.dates[lastIdx])}</div></div>
+    <div class="pr-kpi"><div class="pr-kpi-label">Crecimiento Nac. (2 meses)</div><div class="pr-kpi-value" style="font-size:12px">${nationalGrowth.growthPct===null?'—':fmtMoney(nationalGrowth.current)}</div><div class="pr-kpi-growth">${prFmtGrowth(nationalGrowth.growthPct, true)} ${nationalGrowth.ref?('vs '+fmtMonthLabel(inv.dates[refIdx])):''}</div></div>
+    <div class="pr-kpi"><div class="pr-kpi-label">Regional Oriental</div><div class="pr-kpi-value">${fmtMoney(inv.orientalSeries[inv.orientalSeries.length-1])}</div><div class="pr-kpi-growth" style="color:#94A3B8">NDC SCZ + DEV PROV SCZ</div></div>
+    <div class="pr-kpi"><div class="pr-kpi-label">Regional Occidental</div><div class="pr-kpi-value">${fmtMoney(inv.occidentalSeries[inv.occidentalSeries.length-1])}</div><div class="pr-kpi-growth" style="color:#94A3B8">NDC LPZ</div></div>
+  </div>`;
+
+  const whMeta = [ ['NDC SCZ','kpiNdcScz'], ['DEV PROV SCZ','kpiDevProv'], ['NDC LPZ','kpiNdcLpz'] ];
+  kpis += `<div class="pr-kpi-grid pr-kpi-3">` + whMeta.map(([key])=>{
+    const series = inv.warehouses[key].total;
+    const g = computeGrowthTwoMonths(series);
+    return `<div class="pr-kpi"><div class="pr-kpi-label">${key}</div><div class="pr-kpi-value">${fmtMoney(series[series.length-1])}</div><div class="pr-kpi-growth">${prFmtGrowth(g.growthPct, true)} <span style="color:#94A3B8">vs prom. 2 meses atrás</span></div></div>`;
+  }).join('') + `</div>`;
+
+  const charts = `<div class="pr-charts-row">
+    <div class="pr-chart-box" style="grid-column:1 / span 2"><div class="pr-chart-title">Evolución Nacional del Importe</div><canvas id="prChartNacional" width="1600" height="480"></canvas></div>
+  </div>
+  <div class="pr-charts-row">
+    <div class="pr-chart-box"><div class="pr-chart-title">Evolución por Almacén</div><canvas id="prChartAlmacenes" width="800" height="480"></canvas></div>
+    <div class="pr-chart-box"><div class="pr-chart-title">Comparativo Regional</div><canvas id="prChartRegional" width="800" height="480"></canvas></div>
+  </div>`;
+
+  const providers = inv.providers.filter(p=>p.current>0);
+  const rows = providers.map((p,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td>${p.name}</td>
+      <td>${fmtMoney(p.byWarehouse['NDC SCZ']||0)}</td>
+      <td>${fmtMoney(p.byWarehouse['DEV PROV SCZ']||0)}</td>
+      <td>${fmtMoney(p.byWarehouse['NDC LPZ']||0)}</td>
+      <td><b>${fmtMoney(p.current)}</b></td>
+      <td>${prFmtGrowth(p.growthPct, true)}</td>
+    </tr>`).join('');
+
+  const table = `<div class="pr-table-title">Ranking Completo de Proveedores / Líneas (${providers.length} registros) — mes vigente</div>
+  <table class="pr-table">
+    <thead><tr><th>#</th><th>Línea</th><th>NDC SCZ</th><th>DEV PROV SCZ</th><th>NDC LPZ</th><th>Total Nacional</th><th>Var. vs prom. 2m</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+
+  return `<div class="pr-section-title">📦 Inventario de Almacenes</div>
+    <div class="pr-note">Año seleccionado: ${state.invFilters.year}. Los indicadores de variación se calculan contra el promedio de los dos meses anteriores; un incremento se resalta en rojo y una disminución en verde.</div>
+    ${kpis}${charts}${table}`;
+}
+
+function renderPrintInventarioCharts(){
+  const inv = state.inv;
+  const idxs = filteredMonthIndices(inv.dates, state.invFilters.year);
+  const labels = idxs.map(i=>fmtMonthLabel(inv.dates[i]));
+
+  makeLightChart('prChartNacional', {
+    type:'line',
+    data:{ labels, datasets:[{ label:'Importe Nacional', data: idxs.map(i=>inv.nationalSeries[i]), borderColor:'#F2994A', backgroundColor:'rgba(242,153,74,.15)', fill:true, tension:.3, pointRadius:2, borderWidth:2 }]},
+    options:{ responsive:false, animation:false,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{ ticks:{color:PR_LIGHT_TICK, font:{size:11}}, grid:{color:PR_LIGHT_GRID} }, y:{ ticks:{color:PR_LIGHT_TICK, font:{size:11}, callback:(v)=>fmtMoney(v)}, grid:{color:PR_LIGHT_GRID} } }
+    }
+  });
+
+  const whColors = { 'NDC SCZ':'#F2994A', 'DEV PROV SCZ':'#F2C94C', 'NDC LPZ':'#EB5757' };
+  makeLightChart('prChartAlmacenes', {
+    type:'line',
+    data:{ labels, datasets: Object.keys(whColors).map(k=>({ label:k, data: idxs.map(i=>inv.warehouses[k].total[i]??null), borderColor:whColors[k], backgroundColor:whColors[k], tension:.3, pointRadius:1.5, borderWidth:2 })) },
+    options:{ responsive:false, animation:false,
+      plugins:{ legend:PR_LIGHT_LEGEND },
+      scales:{ x:{ ticks:{color:PR_LIGHT_TICK, font:{size:10}}, grid:{color:PR_LIGHT_GRID} }, y:{ ticks:{color:PR_LIGHT_TICK, font:{size:10}, callback:(v)=>fmtMoney(v)}, grid:{color:PR_LIGHT_GRID} } }
+    }
+  });
+
+  const refIdx2 = Math.max(0, inv.orientalSeries.length-3);
+  const lastIdx2 = inv.orientalSeries.length-1;
+  makeLightChart('prChartRegional', {
+    type:'bar',
+    data:{ labels:['Regional Oriental','Regional Occidental'], datasets:[
+      { label: inv.dates[refIdx2]?fmtMonthLabel(inv.dates[refIdx2]):'Referencia', data:[inv.orientalSeries[refIdx2], inv.occidentalSeries[refIdx2]], backgroundColor:'#CBD5E1', borderRadius:4 },
+      { label: inv.dates[lastIdx2]?fmtMonthLabel(inv.dates[lastIdx2]):'Actual', data:[inv.orientalSeries[lastIdx2], inv.occidentalSeries[lastIdx2]], backgroundColor:'#F2994A', borderRadius:4 }
+    ]},
+    options:{ responsive:false, animation:false,
+      plugins:{ legend:PR_LIGHT_LEGEND },
+      scales:{ x:{ ticks:{color:PR_LIGHT_TICK, font:{size:10}}, grid:{display:false} }, y:{ ticks:{color:PR_LIGHT_TICK, font:{size:10}, callback:(v)=>fmtMoney(v)}, grid:{color:PR_LIGHT_GRID} } }
+    }
+  });
+}
+
+function buildPrintRecuperacionSection(){
+  const rec = state.rec;
+  const year = state.recFilters.year;
+  const region = state.recFilters.region;
+  const orientalF = filterRecRows(rec.oriental, year);
+  const occidentalF = filterRecRows(rec.occidental, year);
+  let rowsForKpi;
+  if(region==='oriental') rowsForKpi = orientalF;
+  else if(region==='occidental') rowsForKpi = occidentalF;
+  else rowsForKpi = [...orientalF, ...occidentalF];
+  const k = computeRecKPIs(rowsForKpi);
+
+  const kpis = `<div class="pr-kpi-grid">
+    <div class="pr-kpi"><div class="pr-kpi-label">Total Recuperado</div><div class="pr-kpi-value">${fmtMoney(k.totalRecuperado)}</div></div>
+    <div class="pr-kpi"><div class="pr-kpi-label">Total Recuperable</div><div class="pr-kpi-value">${fmtMoney(k.totalRecuperable)}</div></div>
+    <div class="pr-kpi"><div class="pr-kpi-label">% Recuperación</div><div class="pr-kpi-value">${fmtPct(k.pct)}</div></div>
+    <div class="pr-kpi"><div class="pr-kpi-label">No Recuperado</div><div class="pr-kpi-value">${fmtMoney(k.noRecuperado)}</div></div>
+  </div>`;
+
+  const charts = `<div class="pr-charts-row">
+    <div class="pr-chart-box"><div class="pr-chart-title">Oriental vs Occidental</div><canvas id="prChartOrienteOccidente" width="800" height="480"></canvas></div>
+    <div class="pr-chart-box"><div class="pr-chart-title">% Recuperado</div><canvas id="prChartDonut" width="800" height="480"></canvas></div>
+  </div>
+  <div class="pr-charts-row">
+    <div class="pr-chart-box" style="grid-column:1 / span 2"><div class="pr-chart-title">Evolución Temporal del Total Recuperado</div><canvas id="prChartEvolucion" width="1600" height="440"></canvas></div>
+  </div>`;
+
+  function buildTable(rows, hasReval){
+    const sorted = rows.slice().sort((a,b)=>(a.anio*12+MESES.indexOf(a.mes.toUpperCase()))-(b.anio*12+MESES.indexOf(b.mes.toUpperCase())));
+    const head = `<tr><th>Año</th><th>Mes</th><th>Recuperable</th><th>Egr. NDC</th><th>Egr. Cambio</th><th>Recup. Facturación</th>${hasReval?'<th>Egr. Revaloriz.</th>':''}<th>Egr. Redistrib.</th><th>Total Recuperado</th><th>No Recuperado</th><th>%</th></tr>`;
+    const body = sorted.map(r=>`<tr>
+      <td>${r.anio}</td><td>${r.mes}</td><td>${fmtMoney(r.ingresoSalas)}</td><td>${fmtMoney(r.egresosNdc)}</td><td>${fmtMoney(r.egresosCambio)}</td><td>${fmtMoney(r.recuperadoFacturacion)}</td>
+      ${hasReval?`<td>${fmtMoney(r.egresosRevalorizacion)}</td>`:''}
+      <td>${fmtMoney(r.egresoRedistribucion)}</td><td><b>${fmtMoney(r.totalRecuperado)}</b></td><td>${fmtMoney(r.noRecuperado)}</td><td>${fmtPct(r.pct)}</td>
+    </tr>`).join('');
+    return `<table class="pr-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  }
+
+  const tables = `<div class="pr-table-title">Regional Oriental — Detalle Mensual</div>${buildTable(orientalF, true)}
+  <div class="pr-table-title">Regional Occidental — Detalle Mensual</div>${buildTable(occidentalF, false)}`;
+
+  return `<div class="pr-section-title pr-section-recuperacion">♻️ Indicador de Recuperación</div>
+    <div class="pr-note">Filtro aplicado: año ${year}, regional ${region}.</div>
+    ${kpis}${charts}${tables}`;
+}
+
+function renderPrintRecuperacionCharts(){
+  const rec = state.rec;
+  const year = state.recFilters.year;
+  const orientalF = filterRecRows(rec.oriental, year);
+  const occidentalF = filterRecRows(rec.occidental, year);
+  const kOriental = computeRecKPIs(orientalF);
+  const kOccidental = computeRecKPIs(occidentalF);
+  const kAll = computeRecKPIs([...orientalF, ...occidentalF]);
+
+  makeLightChart('prChartOrienteOccidente', {
+    type:'bar',
+    data:{ labels:['Recuperable','Recuperado','No Recuperado'], datasets:[
+      { label:'Regional Oriental', data:[kOriental.totalRecuperable, kOriental.totalRecuperado, kOriental.noRecuperado], backgroundColor:'#F2994A', borderRadius:4 },
+      { label:'Regional Occidental', data:[kOccidental.totalRecuperable, kOccidental.totalRecuperado, kOccidental.noRecuperado], backgroundColor:'#EB5757', borderRadius:4 }
+    ]},
+    options:{ responsive:false, animation:false, plugins:{legend:PR_LIGHT_LEGEND},
+      scales:{ x:{ ticks:{color:PR_LIGHT_TICK, font:{size:10}}, grid:{display:false} }, y:{ ticks:{color:PR_LIGHT_TICK, font:{size:10}, callback:(v)=>fmtMoney(v)}, grid:{color:PR_LIGHT_GRID} } }
+    }
+  });
+
+  makeLightChart('prChartDonut', {
+    type:'doughnut',
+    data:{ labels:['Recuperado','No Recuperado'], datasets:[{ data:[Math.max(kAll.totalRecuperado,0), Math.max(kAll.noRecuperado,0)], backgroundColor:['#059669','#E2E8F0'], borderWidth:0 }]},
+    options:{ responsive:false, animation:false, cutout:'65%', plugins:{ legend:PR_LIGHT_LEGEND } }
+  });
+
+  const periodSet = new Map();
+  function keyOf(r){ return r.anio*12 + MESES.indexOf(r.mes.toUpperCase()); }
+  orientalF.forEach(r=>periodSet.set(keyOf(r), {anio:r.anio, mes:r.mes}));
+  occidentalF.forEach(r=>periodSet.set(keyOf(r), {anio:r.anio, mes:r.mes}));
+  const periods = Array.from(periodSet.keys()).sort((a,b)=>a-b);
+  const evLabels = periods.map(p=>{ const info=periodSet.get(p); const idx=MESES.indexOf(info.mes.toUpperCase()); return `${MESES_CORTO[idx]} ${info.anio}`; });
+  const orientalMap = new Map(orientalF.map(r=>[keyOf(r), r.totalRecuperado]));
+  const occidentalMap = new Map(occidentalF.map(r=>[keyOf(r), r.totalRecuperado]));
+
+  makeLightChart('prChartEvolucion', {
+    type:'line',
+    data:{ labels: evLabels, datasets:[
+      { label:'Regional Oriental', data: periods.map(p=>orientalMap.has(p)?orientalMap.get(p):null), borderColor:'#F2994A', backgroundColor:'rgba(242,153,74,.12)', tension:.3, pointRadius:1.5, borderWidth:2 },
+      { label:'Regional Occidental', data: periods.map(p=>occidentalMap.has(p)?occidentalMap.get(p):null), borderColor:'#EB5757', backgroundColor:'rgba(235,87,87,.12)', tension:.3, pointRadius:1.5, borderWidth:2 }
+    ]},
+    options:{ responsive:false, animation:false, plugins:{legend:PR_LIGHT_LEGEND},
+      scales:{ x:{ ticks:{color:PR_LIGHT_TICK, font:{size:10}}, grid:{color:PR_LIGHT_GRID} }, y:{ ticks:{color:PR_LIGHT_TICK, font:{size:10}, callback:(v)=>fmtMoney(v)}, grid:{color:PR_LIGHT_GRID} } }
+    }
+  });
+}
+
+document.getElementById('btnExportPDF').addEventListener('click', ()=>{
+  buildPrintReport();
+  setTimeout(()=>window.print(), 60);
+});
+</script>
+</body>
+</html>
