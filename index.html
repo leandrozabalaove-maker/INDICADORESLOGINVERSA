@@ -98,7 +98,7 @@
   .rec-charts{display:grid;grid-template-columns:1.3fr 1fr 1.3fr;gap:8px;}
   .rec-tables{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-height:0;}
 
-  /* Overrides de utilidades Tailwind (asumen fondo claro por defecto) */
+  /* Overrides de utilidades Tailwind */
   .text-slate-400{color:var(--text-secondary) !important;}
   .text-slate-600{color:var(--text-secondary) !important;}
   .text-slate-700{color:var(--text-primary) !important;}
@@ -111,7 +111,7 @@
   }
 
   /* =========================================================
-     REPORTE DE IMPRESION / PDF (tema claro, independiente de la UI)
+     REPORTE DE IMPRESION / PDF
   ========================================================= */
   .print-report{display:none;background:#fff;color:#1E293B;}
   @page{margin:14mm;}
@@ -154,7 +154,7 @@
         <img src="logo chavez 3.png" alt="Farmacias Chávez" class="h-8 w-auto flex-shrink-0">
         <div class="min-w-0 border-l border-white/10 pl-2.5">
           <h1 class="text-white text-[12px] font-bold leading-tight tracking-tight">Panel de Indicadores Logísticos</h1>
-          <p class="text-[10px] text-slate-400 truncate" id="lastUpdate">Sin datos cargados</p>
+          <p class="text-[10px] text-slate-400 truncate" id="lastUpdate">Inicializando...</p>
         </div>
       </div>
       <nav class="flex gap-1">
@@ -180,7 +180,7 @@
       <div id="inv-empty" class="empty-state card">
         <div class="text-3xl">📦</div>
         <h2 class="text-base font-bold text-slate-700">Sin datos de inventario</h2>
-        <p class="max-w-md text-xs">Cargando automáticamente desde Google Drive...</p>
+        <p class="max-w-md text-xs">Conectando a Google Drive... Si no se actualiza, revisa los formatos de tu archivo Excel.</p>
       </div>
 
       <div id="inv-content" class="hidden inv-grid">
@@ -200,7 +200,6 @@
         </aside>
 
         <div class="inv-main">
-
           <div class="card px-3 py-1.5 flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-1.5">
               <span class="kpi-label">Año</span>
@@ -292,7 +291,7 @@
       <div id="rec-empty" class="empty-state card">
         <div class="text-3xl">♻️</div>
         <h2 class="text-base font-bold text-slate-700">Sin datos de recuperación</h2>
-        <p class="max-w-md text-xs">Cargando automáticamente desde Google Drive...</p>
+        <p class="max-w-md text-xs">Conectando a Google Drive... Si no se actualiza, revisa los formatos de tu archivo Excel.</p>
       </div>
 
       <div id="rec-content" class="hidden rec-grid">
@@ -384,8 +383,8 @@
    ESTADO GLOBAL
 ========================================================================= */
 const state = {
-  inv: null,          // datos parseados del inventario
-  rec: null,          // datos parseados de recuperación
+  inv: null,
+  rec: null,
   invFilters: { year: 'todos', warehouses: new Set(['NDC SCZ','DEV PROV SCZ','NDC LPZ']), search: '' },
   recFilters: { year: 'todos', region: 'todas' },
   sort: { top10: {key:'total', dir:-1}, oriental: {key:'anio', dir:1}, occidental:{key:'anio',dir:1} },
@@ -397,7 +396,6 @@ const COLORS = { blue:'#F2994A', amber:'#F2C94C', violet:'#EB5757', teal:'#F2994
 const MESES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-// Tema oscuro global para todos los gráficos Chart.js
 Chart.defaults.color = '#9AA0AC';
 Chart.defaults.borderColor = '#2C2F36';
 Chart.defaults.font.family = "'Segoe UI', ui-sans-serif, system-ui, sans-serif";
@@ -432,34 +430,50 @@ function fmtPct(v,dec=1){
   if(v===null||v===undefined||isNaN(v)) return '—';
   return v.toFixed(dec)+'%';
 }
-function fmtMonthLabel(d){
-  if(!(d instanceof Date) || isNaN(d)) return '';
-  return MESES_CORTO[d.getMonth()] + ' ' + d.getFullYear();
-}
 function excelSerialToDate(n){
-  // fallback por si alguna celda llega como numero serial
   const utcDays = Math.floor(n - 25569);
   const utcValue = utcDays * 86400;
   return new Date(utcValue * 1000);
 }
+
+// Nueva función de lectura de fechas a prueba de fallos
 function toDateSafe(v){
-  if(v instanceof Date) return v;
+  if(v instanceof Date && !isNaN(v)) return v;
   if(typeof v === 'number') return excelSerialToDate(v);
+  if(typeof v === 'string'){
+     const t = v.trim();
+     // Si Excel exportó como texto (ej: "ENERO", "FEB")
+     const idx = MESES.indexOf(t.toUpperCase());
+     if(idx >= 0) return t; 
+     const d = new Date(t);
+     if(!isNaN(d)) return d;
+     return t; 
+  }
   return null;
 }
+
+// Nueva función formateadora que soporta strings
+function fmtMonthLabel(d){
+  if(d instanceof Date && !isNaN(d)){
+     return MESES_CORTO[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  if(typeof d === 'string') return d;
+  return '';
+}
+
 function findSheet(wb, candidates){
   const names = wb.SheetNames;
   for(const cand of candidates){
     const hit = names.find(n => n.trim().toUpperCase() === cand.trim().toUpperCase());
     if(hit) return wb.Sheets[hit];
   }
-  // fallback: coincidencia parcial
   for(const cand of candidates){
     const hit = names.find(n => n.trim().toUpperCase().includes(cand.trim().toUpperCase()));
     if(hit) return wb.Sheets[hit];
   }
   return null;
 }
+
 function sheetToArray(ws){
   let range = { s:{r:0,c:0}, e:{r:0,c:0} };
   if(ws && ws['!ref']){
@@ -469,51 +483,12 @@ function sheetToArray(ws){
   return XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:null, range: XLSX.utils.encode_range(range) });
 }
 
-/* =========================================================================
-   PARSEO: BD INVENTARIO DE ALMACENES
-========================================================================= */
-function parseWarehouseSheet(ws){
-  if(!ws) return null;
-  const data = sheetToArray(ws);
-  let headerIdx = -1;
-  for(let r=0;r<data.length;r++){
-    const v = data[r] ? data[r][1] : null;
-    if(v && String(v).trim().toUpperCase()==='LINEA'){ headerIdx = r; break; }
-  }
-  if(headerIdx < 0) return null;
-  const totalIdx = headerIdx - 2;
-  const header = data[headerIdx] || [];
-  let endCol = header.length;
-  for(let c=2;c<header.length;c++){
-    if(header[c]!==null && String(header[c]).trim()==='%'){ endCol = c; break; }
-  }
-  const startCol = 2;
-  const dates = [];
-  for(let c=startCol;c<endCol;c++){ dates.push(toDateSafe(header[c])); }
-
-  const totalRow = data[totalIdx] || [];
-  const total = [];
-  for(let c=startCol;c<endCol;c++){ total.push(numOrZero(totalRow[c])); }
-
-  const lines = [];
-  for(let r=headerIdx+1;r<data.length;r++){
-    const row = data[r];
-    if(!row) continue;
-    const name = row[1];
-    if(name===null || name===undefined || String(name).trim()==='') continue;
-    const values = [];
-    for(let c=startCol;c<endCol;c++){ values.push(numOrZero(row[c])); }
-    lines.push({ name: String(name).trim(), values });
-  }
-  return { dates, total, lines };
-}
-
 function mergeDateArrays(arrs){
   const len = Math.max(0, ...arrs.map(a=>a.length));
   const merged = [];
   for(let i=0;i<len;i++){
     let d = null;
-    for(const a of arrs){ if(a[i] instanceof Date){ d = a[i]; break; } }
+    for(const a of arrs){ if(a[i] !== null && a[i] !== undefined){ d = a[i]; break; } }
     merged.push(d);
   }
   return merged;
@@ -531,6 +506,82 @@ function computeGrowthTwoMonths(series){
   const ref = series[n-3];
   if(!ref) return { growthPct:null, current, ref };
   return { growthPct: (current-ref)/ref*100, current, ref };
+}
+
+/* =========================================================================
+   PARSER REESCRITO: INVENTARIO DE ALMACENES
+========================================================================= */
+function parseWarehouseSheet(ws){
+  if(!ws) return null;
+  const data = sheetToArray(ws);
+  let headerIdx = -1;
+  let lineaCol = -1;
+
+  // Escaneo dinámico horizontal y vertical para encontrar "LINEA"
+  for(let r=0; r<Math.min(data.length, 30); r++){
+    const row = data[r];
+    if(!row) continue;
+    for(let c=0; c<row.length; c++){
+      if(row[c] && String(row[c]).trim().toUpperCase().includes('LINEA')){
+        headerIdx = r;
+        lineaCol = c;
+        break;
+      }
+    }
+    if(headerIdx !== -1) break;
+  }
+
+  if(headerIdx < 0) return null;
+
+  // Búsqueda dinámica de la fila "TOTAL" (usualmente arriba de la cabecera)
+  let totalIdx = -1;
+  for(let r=headerIdx-1; r>=Math.max(0, headerIdx-5); r--){
+    const row = data[r];
+    if(row && row[lineaCol] && String(row[lineaCol]).trim().toUpperCase().includes('TOTAL')){
+      totalIdx = r; break;
+    }
+  }
+  if(totalIdx === -1){
+      totalIdx = Math.max(0, headerIdx - 1); // fallback automático
+  }
+
+  const header = data[headerIdx] || [];
+  const startCol = lineaCol + 1; // Los meses empiezan justo a la derecha de la columna "Línea"
+  let endCol = header.length;
+
+  for(let c=startCol; c<header.length; c++){
+    if(header[c] !== null && String(header[c]).trim().includes('%')){ endCol = c; break; }
+  }
+
+  const dates = [];
+  for(let c=startCol; c<endCol; c++){
+    dates.push(toDateSafe(header[c]));
+  }
+
+  const totalRow = data[totalIdx] || [];
+  const total = [];
+  for(let c=startCol; c<endCol; c++){
+    total.push(numOrZero(totalRow[c]));
+  }
+
+  const lines = [];
+  for(let r=headerIdx+1; r<data.length; r++){
+    const row = data[r];
+    if(!row) continue;
+    const name = row[lineaCol];
+    
+    // Ignorar filas en blanco o la fila de totales inferior
+    if(name === null || name === undefined || String(name).trim() === '') continue;
+    if(String(name).trim().toUpperCase().includes('TOTAL')) continue;
+
+    const values = [];
+    for(let c=startCol; c<endCol; c++){
+      values.push(numOrZero(row[c]));
+    }
+    lines.push({ name: String(name).trim(), values });
+  }
+
+  return { dates, total, lines };
 }
 
 function buildLineSeries(warehouses){
@@ -577,7 +628,7 @@ function parseInventoryWorkbook(wb){
   const ndcLpz  = parseWarehouseSheet(wsNdcLpz);
 
   if(!ndcScz && !devProv && !ndcLpz){
-    console.error('No se encontraron las hojas (NDC SCZ, DEV PROV SCZ, NDC LPZ).');
+    console.error("Hojas de almacén no encontradas.");
   }
 
   const warehouses = {
@@ -592,26 +643,33 @@ function parseInventoryWorkbook(wb){
   const occidentalSeries = warehouses['NDC LPZ'].total.slice();
 
   const providers = buildLineSeries(warehouses);
-  const years = Array.from(new Set(dates.filter(d=>d instanceof Date).map(d=>d.getFullYear()))).sort();
+  
+  // Extraer años dinámicamente de las fechas
+  const yearsSet = new Set();
+  dates.forEach(d => {
+    if(d instanceof Date && !isNaN(d)) yearsSet.add(d.getFullYear());
+    else if(typeof d === 'string' && d.match(/\d{4}/)) yearsSet.add(parseInt(d.match(/\d{4}/)[0]));
+  });
+  const years = Array.from(yearsSet).sort();
 
   return { dates, warehouses, nationalSeries, orientalSeries, occidentalSeries, providers, years };
 }
 
 /* =========================================================================
-   PARSEO: BD INDICADOR RECUPERACION
+   PARSER REESCRITO: INDICADOR RECUPERACION
 ========================================================================= */
 function buildRecColMap(headerRow){
   const map = {};
   headerRow.forEach((h,i)=>{
     if(h===null||h===undefined) return;
     const s = String(h).trim().toUpperCase();
-    if(s==='AÑO' || s==='ANIO' || s==='AÑO ') map.anio=i;
-    else if(s==='MES') map.mes=i;
-    else if(s.includes('INGRESO DE SALAS')) map.ingreso=i;
+    if(s.includes('AÑO') || s.includes('ANIO')) map.anio=i;
+    else if(s.includes('MES')) map.mes=i;
+    else if(s.includes('INGRESO DE SALAS') || s.includes('RECUPERABLE')) map.ingreso=i;
     else if(s.includes('EXCEPCIONAL')) map.excepcionales=i;
-    else if(s.includes('EGRESOS X NDC')) map.egresosNdc=i;
-    else if(s.includes('CAMBIO DE PRODUCTO')) map.egresosCambio=i;
-    else if(s.includes('RECUPERADO POR FACTURACI')) map.recuperadoFacturacion=i;
+    else if(s.includes('EGRESOS X NDC') || s.includes('EGRESO X NDC') || s.includes('NDC')) map.egresosNdc=i;
+    else if(s.includes('CAMBIO DE PRODUCTO') || s.includes('CAMBIO')) map.egresosCambio=i;
+    else if(s.includes('RECUPERADO POR FACTURACI') || s.includes('FACTURACI')) map.recuperadoFacturacion=i;
     else if(s.includes('REVALORIZACI')) map.egresosRevalorizacion=i;
     else if(s.includes('REDISTRIBUCI')) map.egresoRedistribucion=i;
     else if(s.includes('TOTAL RECUPERADO')) map.totalCol=i;
@@ -619,15 +677,22 @@ function buildRecColMap(headerRow){
   });
   return map;
 }
+
 function extractRecTable(data, headerIdx){
   const colMap = buildRecColMap(data[headerIdx] || []);
   const rows = [];
   if(colMap.anio===undefined) return rows;
-  for(let r=headerIdx+1;r<data.length;r++){
+
+  for(let r=headerIdx+1; r<data.length; r++){
     const row = data[r];
     if(!row) break;
-    const anioVal = row[colMap.anio];
-    if(typeof anioVal !== 'number') break; // corta en fila TOTAL o vacía
+
+    let anioVal = row[colMap.anio];
+    if(anioVal !== null && anioVal !== undefined) {
+       anioVal = parseInt(String(anioVal).trim(), 10);
+    }
+    if(isNaN(anioVal) || anioVal < 2000) break; // Terminar de leer en fila TOTAL o vacía
+
     const ingresoSalas = numOrZero(row[colMap.ingreso]);
     const excepcionales = numOrZero(row[colMap.excepcionales]);
     const egresosNdc = numOrZero(row[colMap.egresosNdc]);
@@ -635,9 +700,11 @@ function extractRecTable(data, headerIdx){
     const recuperadoFacturacion = numOrZero(row[colMap.recuperadoFacturacion]);
     const egresosRevalorizacion = (colMap.egresosRevalorizacion!==undefined) ? numOrZero(row[colMap.egresosRevalorizacion]) : 0;
     const egresoRedistribucion = numOrZero(row[colMap.egresoRedistribucion]);
+    
     const totalRecuperado = egresosNdc + egresosCambio + recuperadoFacturacion + egresoRedistribucion - egresosRevalorizacion;
     const noRecuperado = ingresoSalas - totalRecuperado;
     const pct = ingresoSalas !== 0 ? (totalRecuperado/ingresoSalas*100) : 0;
+    
     rows.push({
       anio: anioVal,
       mes: String(row[colMap.mes]||'').trim(),
@@ -648,24 +715,51 @@ function extractRecTable(data, headerIdx){
   }
   return rows;
 }
+
 function parseRecuperacionWorkbook(wb){
-  const ws = findSheet(wb, ["KPI´s ACTUALIZADO", "KPI'S ACTUALIZADO", "KPIS ACTUALIZADO", "KPI"]) || wb.Sheets[wb.SheetNames[0]];
+  let ws = findSheet(wb, ["KPI´s ACTUALIZADO", "KPI'S ACTUALIZADO", "KPIS ACTUALIZADO", "KPI"]);
+  if(!ws) ws = wb.Sheets[wb.SheetNames[0]];
+
   const data = sheetToArray(ws);
   const headerRows = [];
+  
+  // Encontrar en qué filas están las cabeceras buscando la columna "AÑO"
   for(let r=0;r<data.length;r++){
     const row = data[r];
-    if(row && row[0]!==null && String(row[0]).trim().toUpperCase()==='AÑO'){
-      headerRows.push(r);
+    if(!row) continue;
+    for(let c=0; c<row.length; c++){
+       if(row[c] !== null && String(row[c]).trim().toUpperCase().includes('AÑO')){
+          headerRows.push(r);
+          break;
+       }
     }
   }
-  const oriental = headerRows.length>0 ? extractRecTable(data, headerRows[0]) : [];
-  const occidental = headerRows.length>1 ? extractRecTable(data, headerRows[1]) : [];
+
+  let oriental = [], occidental = [];
+  if (headerRows.length >= 2) {
+     oriental = extractRecTable(data, headerRows[0]);
+     occidental = extractRecTable(data, headerRows[1]);
+  } else if (headerRows.length === 1) {
+     oriental = extractRecTable(data, headerRows[0]);
+     // Buscar en otra pestaña si no están en la misma hoja
+     const wsOcc = findSheet(wb, ["OCCIDENTAL", "REGIONAL OCCIDENTAL", "LPZ"]);
+     if(wsOcc) {
+        const dataOcc = sheetToArray(wsOcc);
+        for(let r=0; r<dataOcc.length; r++){
+          if(dataOcc[r] && dataOcc[r].some(cell => String(cell).toUpperCase().includes('AÑO'))){
+             occidental = extractRecTable(dataOcc, r);
+             break;
+          }
+        }
+     }
+  }
+
   const years = Array.from(new Set([...oriental, ...occidental].map(r=>r.anio))).sort();
   return { oriental, occidental, years };
 }
 
 /* =========================================================================
-   RENDER: TAB INVENTARIO
+   RENDERIZADO DE LA INTERFAZ
 ========================================================================= */
 function destroyChart(key){
   if(state.charts[key]){ state.charts[key].destroy(); delete state.charts[key]; }
@@ -683,13 +777,15 @@ function filteredMonthIndices(dates, year){
   for(let i=0;i<dates.length;i++){
     const d = dates[i];
     if(!d) continue;
-    if(year==='todos' || d.getFullYear()===Number(year)) idxs.push(i);
+    if(year==='todos') idxs.push(i);
+    else if(d instanceof Date && d.getFullYear()===Number(year)) idxs.push(i);
+    else if(typeof d === 'string' && d.includes(year)) idxs.push(i);
   }
   return idxs;
 }
 
 function renderInventario(){
-  if(!state.inv) return;
+  if(!state.inv || state.inv.nationalSeries.length === 0) return;
   document.getElementById('inv-empty').classList.add('hidden');
   document.getElementById('inv-content').classList.remove('hidden');
 
@@ -708,7 +804,7 @@ function renderInventario(){
     gc.title = 'Datos insuficientes';
   } else {
     gc.innerHTML = growthBadgeHTML(nationalGrowth.growthPct);
-    const refIdx = inv.nationalSeries.length-3;
+    const refIdx = Math.max(0, inv.nationalSeries.length-3);
     gc.title = `vs promedio 2 meses atrás (${fmtMonthLabel(inv.dates[refIdx])}): ${fmtMoney(nationalGrowth.ref)}`;
   }
 
@@ -722,7 +818,7 @@ function renderInventario(){
   ];
   whMeta.forEach(m=>{
     const series = inv.warehouses[m.key].total;
-    const last = series[series.length-1];
+    const last = series[series.length-1] || 0;
     document.getElementById(m.valId).textContent = fmtMoney(last);
     const g = computeGrowthTwoMonths(series);
     const el = document.getElementById(m.growId);
@@ -773,15 +869,15 @@ function renderInventario(){
 
   destroyChart('regional');
   const refIdx2 = Math.max(0, inv.orientalSeries.length-3);
-  const lastIdx2 = inv.orientalSeries.length-1;
+  const lastIdx2 = Math.max(0, inv.orientalSeries.length-1);
   const ctxReg = document.getElementById('chartRegional').getContext('2d');
   state.charts.regional = new Chart(ctxReg, {
     type:'bar',
     data:{
       labels:['Regional Oriental','Regional Occidental'],
       datasets:[
-        { label: inv.dates[refIdx2] ? fmtMonthLabel(inv.dates[refIdx2]) : 'Referencia', data:[inv.orientalSeries[refIdx2], inv.occidentalSeries[refIdx2]], backgroundColor:'#3A3D44', borderRadius:6 },
-        { label: inv.dates[lastIdx2] ? fmtMonthLabel(inv.dates[lastIdx2]) : 'Actual', data:[inv.orientalSeries[lastIdx2], inv.occidentalSeries[lastIdx2]], backgroundColor: COLORS.blue, borderRadius:6 }
+        { label: inv.dates[refIdx2] ? fmtMonthLabel(inv.dates[refIdx2]) : 'Referencia', data:[inv.orientalSeries[refIdx2]||0, inv.occidentalSeries[refIdx2]||0], backgroundColor:'#3A3D44', borderRadius:6 },
+        { label: inv.dates[lastIdx2] ? fmtMonthLabel(inv.dates[lastIdx2]) : 'Actual', data:[inv.orientalSeries[lastIdx2]||0, inv.occidentalSeries[lastIdx2]||0], backgroundColor: COLORS.blue, borderRadius:6 }
       ]
     },
     options:{
@@ -887,9 +983,6 @@ function stopAutoScroll(){
   if(autoScrollTimer){ clearInterval(autoScrollTimer); autoScrollTimer = null; }
 }
 
-/* =========================================================================
-   RENDER: TAB RECUPERACION
-========================================================================= */
 function populateRecFilters(){
   const sel = document.getElementById('recYearSelect');
   sel.innerHTML = '<option value="todos">Todos los años</option>' +
@@ -911,7 +1004,7 @@ function computeRecKPIs(rows){
 }
 
 function renderRecuperacion(){
-  if(!state.rec) return;
+  if(!state.rec || (state.rec.oriental.length===0 && state.rec.occidental.length===0)) return;
   document.getElementById('rec-empty').classList.add('hidden');
   document.getElementById('rec-content').classList.remove('hidden');
 
@@ -1067,12 +1160,9 @@ function renderRecCompositionChart(canvasId, chartKey, rows, accentColor){
 /* =========================================================================
    CARGA DE ARCHIVOS Y CONEXIÓN A GOOGLE DRIVE
 ========================================================================= */
-
-// ENLACES PÚBLICOS DE DRIVE
 const URL_INVENTARIO = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRIyxS6Vzc-Js3DO8u1ejcteLAzk35zlv4YbVBdJmYKhCxsIg90UGaCd18BEjtrmC-Q2E-lbirT7hz8/pub?output=xlsx';
 const URL_RECUPERACION = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkaAknUBypS0ovVuKqBGK76wDgBeTwGfZEB6uTvUYY77By-F-_8suI9ozH1JTlrMzPy3g3QRib-KWG/pub?output=xlsx';
 
-// Función para descargar y leer directamente un archivo publicado
 async function fetchWorkbookFromUrl(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error('No se pudo conectar al enlace de Drive');
@@ -1081,27 +1171,23 @@ async function fetchWorkbookFromUrl(url) {
   return XLSX.read(data, { type: 'array', cellDates: true });
 }
 
-// Lógica de sincronización inicial
 async function initDriveSync() {
   document.getElementById('lastUpdate').textContent = 'Sincronizando con Google Drive...';
   document.getElementById('lblInvText').textContent = '⏳ Conectando...';
   document.getElementById('lblRecText').textContent = '⏳ Conectando...';
 
   try {
-    // Petición simultánea de ambos archivos
     const [wbInv, wbRec] = await Promise.all([
       fetchWorkbookFromUrl(URL_INVENTARIO),
       fetchWorkbookFromUrl(URL_RECUPERACION)
     ]);
 
-    // Parseo y renderizado de Inventario
     state.inv = parseInventoryWorkbook(wbInv);
     document.getElementById('lblInvUpload').classList.add('loaded');
     document.getElementById('lblInvText').textContent = '✅ Inventario (Drive)';
     populateInvFilters();
     renderInventario();
 
-    // Parseo y renderizado de Recuperación
     state.rec = parseRecuperacionWorkbook(wbRec);
     document.getElementById('lblRecUpload').classList.add('loaded');
     document.getElementById('lblRecText').textContent = '✅ Recuperación (Drive)';
@@ -1112,14 +1198,11 @@ async function initDriveSync() {
   } catch (err) {
     console.error('Error durante la sincronización automática:', err);
     document.getElementById('lastUpdate').textContent = 'Error de conexión con Google Drive';
-    alert('Hubo un problema al cargar los datos. Puedes usar los botones superiores para cargar los archivos manualmente.');
   }
 }
 
-// Disparador automático al cargar la página web
 window.addEventListener('DOMContentLoaded', initDriveSync);
 
-// Plan de respaldo: Carga de archivos manual a través de inputs
 function readFileAsWorkbook(file){
   return new Promise((resolve,reject)=>{
     const reader = new FileReader();
@@ -1146,7 +1229,7 @@ document.getElementById('fileInventario').addEventListener('change', async (e)=>
   if(!file) return;
   try{
     const wb = await readFileAsWorkbook(file);
-    state.inv = parseInventoryWorkbook(wbInv);
+    state.inv = parseInventoryWorkbook(wb);
     document.getElementById('lblInvUpload').classList.add('loaded');
     document.getElementById('lblInvText').textContent = '✅ ' + file.name;
     populateInvFilters();
@@ -1239,7 +1322,7 @@ document.querySelectorAll('.mini-export').forEach(btn=>{
 });
 
 /* =========================================================================
-   REPORTE DE IMPRESION / PDF (independiente del layout de pantalla)
+   REPORTE DE IMPRESION / PDF
 ========================================================================= */
 function prFmtGrowth(growthPct, invertido){
   if(growthPct===null || growthPct===undefined) return '<span style="color:#94A3B8">Sin datos suficientes</span>';
@@ -1283,44 +1366,44 @@ function buildPrintReport(){
       <div class="pr-meta">Generado: ${now}<br>Filtros: Inventario año ${state.invFilters.year} · Recuperación año ${state.recFilters.year} / ${state.recFilters.region}</div>
     </div>`;
 
-  if(!state.inv && !state.rec){
-    html += `<p style="text-align:center;color:#94A3B8;padding:40px 0;">No hay datos cargados. Cargue los archivos de Inventario y/o Recuperación antes de exportar.</p></div>`;
+  if((!state.inv || state.inv.nationalSeries.length === 0) && (!state.rec || (state.rec.oriental.length === 0 && state.rec.occidental.length === 0))){
+    html += `<p style="text-align:center;color:#94A3B8;padding:40px 0;">No hay datos cargados. Revise la estructura de los archivos en Drive o súbalos manualmente.</p></div>`;
     box.innerHTML = html;
     return;
   }
 
-  if(state.inv){
+  if(state.inv && state.inv.nationalSeries.length > 0){
     html += buildPrintInventarioSection();
   }
-  if(state.rec){
-    html += (state.inv ? '<div class="pr-page-break"></div>' : '') + buildPrintRecuperacionSection();
+  if(state.rec && (state.rec.oriental.length > 0 || state.rec.occidental.length > 0)){
+    html += (state.inv && state.inv.nationalSeries.length > 0 ? '<div class="pr-page-break"></div>' : '') + buildPrintRecuperacionSection();
   }
 
   html += `<div class="pr-footer">Farmacias Chávez — Dashboard Logístico · Reporte generado automáticamente a partir de los archivos Excel cargados</div></div>`;
   box.innerHTML = html;
 
-  if(state.inv) renderPrintInventarioCharts();
-  if(state.rec) renderPrintRecuperacionCharts();
+  if(state.inv && state.inv.nationalSeries.length > 0) renderPrintInventarioCharts();
+  if(state.rec && (state.rec.oriental.length > 0 || state.rec.occidental.length > 0)) renderPrintRecuperacionCharts();
 }
 
 function buildPrintInventarioSection(){
   const inv = state.inv;
-  const lastIdx = inv.nationalSeries.length-1;
+  const lastIdx = Math.max(0, inv.nationalSeries.length-1);
   const nationalGrowth = computeGrowthTwoMonths(inv.nationalSeries);
-  const refIdx = inv.nationalSeries.length-3;
+  const refIdx = Math.max(0, inv.nationalSeries.length-3);
 
   let kpis = `<div class="pr-kpi-grid">
     <div class="pr-kpi"><div class="pr-kpi-label">Importe Nacional</div><div class="pr-kpi-value">${fmtMoney(inv.nationalSeries[lastIdx])}</div><div class="pr-kpi-growth" style="color:#94A3B8">Al mes de ${fmtMonthLabel(inv.dates[lastIdx])}</div></div>
     <div class="pr-kpi"><div class="pr-kpi-label">Crecimiento Nac. (2 meses)</div><div class="pr-kpi-value" style="font-size:12px">${nationalGrowth.growthPct===null?'—':fmtMoney(nationalGrowth.current)}</div><div class="pr-kpi-growth">${prFmtGrowth(nationalGrowth.growthPct, true)} ${nationalGrowth.ref?('vs '+fmtMonthLabel(inv.dates[refIdx])):''}</div></div>
-    <div class="pr-kpi"><div class="pr-kpi-label">Regional Oriental</div><div class="pr-kpi-value">${fmtMoney(inv.orientalSeries[inv.orientalSeries.length-1])}</div><div class="pr-kpi-growth" style="color:#94A3B8">NDC SCZ + DEV PROV SCZ</div></div>
-    <div class="pr-kpi"><div class="pr-kpi-label">Regional Occidental</div><div class="pr-kpi-value">${fmtMoney(inv.occidentalSeries[inv.occidentalSeries.length-1])}</div><div class="pr-kpi-growth" style="color:#94A3B8">NDC LPZ</div></div>
+    <div class="pr-kpi"><div class="pr-kpi-label">Regional Oriental</div><div class="pr-kpi-value">${fmtMoney(inv.orientalSeries[inv.orientalSeries.length-1]||0)}</div><div class="pr-kpi-growth" style="color:#94A3B8">NDC SCZ + DEV PROV SCZ</div></div>
+    <div class="pr-kpi"><div class="pr-kpi-label">Regional Occidental</div><div class="pr-kpi-value">${fmtMoney(inv.occidentalSeries[inv.occidentalSeries.length-1]||0)}</div><div class="pr-kpi-growth" style="color:#94A3B8">NDC LPZ</div></div>
   </div>`;
 
   const whMeta = [ ['NDC SCZ','kpiNdcScz'], ['DEV PROV SCZ','kpiDevProv'], ['NDC LPZ','kpiNdcLpz'] ];
   kpis += `<div class="pr-kpi-grid pr-kpi-3">` + whMeta.map(([key])=>{
     const series = inv.warehouses[key].total;
     const g = computeGrowthTwoMonths(series);
-    return `<div class="pr-kpi"><div class="pr-kpi-label">${key}</div><div class="pr-kpi-value">${fmtMoney(series[series.length-1])}</div><div class="pr-kpi-growth">${prFmtGrowth(g.growthPct, true)} <span style="color:#94A3B8">vs prom. 2 meses atrás</span></div></div>`;
+    return `<div class="pr-kpi"><div class="pr-kpi-label">${key}</div><div class="pr-kpi-value">${fmtMoney(series[series.length-1]||0)}</div><div class="pr-kpi-growth">${prFmtGrowth(g.growthPct, true)} <span style="color:#94A3B8">vs prom. 2 meses atrás</span></div></div>`;
   }).join('') + `</div>`;
 
   const charts = `<div class="pr-charts-row">
@@ -1379,12 +1462,12 @@ function renderPrintInventarioCharts(){
   });
 
   const refIdx2 = Math.max(0, inv.orientalSeries.length-3);
-  const lastIdx2 = inv.orientalSeries.length-1;
+  const lastIdx2 = Math.max(0, inv.orientalSeries.length-1);
   makeLightChart('prChartRegional', {
     type:'bar',
     data:{ labels:['Regional Oriental','Regional Occidental'], datasets:[
-      { label: inv.dates[refIdx2]?fmtMonthLabel(inv.dates[refIdx2]):'Referencia', data:[inv.orientalSeries[refIdx2], inv.occidentalSeries[refIdx2]], backgroundColor:'#CBD5E1', borderRadius:4 },
-      { label: inv.dates[lastIdx2]?fmtMonthLabel(inv.dates[lastIdx2]):'Actual', data:[inv.orientalSeries[lastIdx2], inv.occidentalSeries[lastIdx2]], backgroundColor:'#F2994A', borderRadius:4 }
+      { label: inv.dates[refIdx2]?fmtMonthLabel(inv.dates[refIdx2]):'Referencia', data:[inv.orientalSeries[refIdx2]||0, inv.occidentalSeries[refIdx2]||0], backgroundColor:'#CBD5E1', borderRadius:4 },
+      { label: inv.dates[lastIdx2]?fmtMonthLabel(inv.dates[lastIdx2]):'Actual', data:[inv.orientalSeries[lastIdx2]||0, inv.occidentalSeries[lastIdx2]||0], backgroundColor:'#F2994A', borderRadius:4 }
     ]},
     options:{ responsive:false, animation:false,
       plugins:{ legend:PR_LIGHT_LEGEND },
