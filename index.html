@@ -624,6 +624,7 @@ function parseInventoryWorkbook(wb){
   const wsNdcLpz   = findSheet(wb, ['NDC LPZ']);
 
   const ndcScz  = parseWarehouseSheet(wsNdcScz);
+  console.log("Muestra de datos de fila:", wsNdcScz ? wsNdcScz[0] : "Vacío");
   const devProv = parseWarehouseSheet(wsDevProv);
   const ndcLpz  = parseWarehouseSheet(wsNdcLpz);
 
