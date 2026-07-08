@@ -580,29 +580,34 @@ function parseWarehouseSheet(ws){
     dates.push(toDateSafe(header[c]));
   }
 
-  const totalRow = data[totalIdx] || [];
-  const total = [];
+const totalRow = data[totalIdx] || [];
+  let total = [];
   for(let c=startCol; c<endCol; c++){
     total.push(numOrZero(totalRow[c]));
   }
-
   const lines = [];
   for(let r=headerIdx+1; r<data.length; r++){
     const row = data[r];
     if(!row) continue;
     const name = row[lineaCol];
-    
     // Ignorar filas en blanco o la fila de totales inferior
     if(name === null || name === undefined || String(name).trim() === '') continue;
     if(String(name).trim().toUpperCase().includes('TOTAL')) continue;
-
     const values = [];
     for(let c=startCol; c<endCol; c++){
       values.push(numOrZero(row[c]));
     }
     lines.push({ name: String(name).trim(), values });
   }
-
+  // Fallback: si la fila "TOTAL" detectada no tiene datos reales,
+  // recalcular el total sumando todas las líneas de producto.
+  const totalIsEmpty = total.every(v => v === 0);
+  if(totalIsEmpty && lines.length > 0){
+    total = new Array(endCol - startCol).fill(0);
+    lines.forEach(line=>{
+      line.values.forEach((v,i)=>{ total[i] += (v||0); });
+    });
+  }
   return { dates, total, lines };
 }
 
