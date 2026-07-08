@@ -436,18 +436,40 @@ function excelSerialToDate(n){
   return new Date(utcValue * 1000);
 }
 
-// Nueva función de lectura de fechas a prueba de fallos
+const MESES_ABREV = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+
 function toDateSafe(v){
   if(v instanceof Date && !isNaN(v)) return v;
   if(typeof v === 'number') return excelSerialToDate(v);
   if(typeof v === 'string'){
-     const t = v.trim();
-     // Si Excel exportó como texto (ej: "ENERO", "FEB")
-     const idx = MESES.indexOf(t.toUpperCase());
-     if(idx >= 0) return t; 
-     const d = new Date(t);
-     if(!isNaN(d)) return d;
-     return t; 
+    const t = v.trim();
+
+    // Nombre completo: "ENERO 2024"
+    const idxFull = MESES.indexOf(t.toUpperCase());
+    if(idxFull >= 0) return t;
+
+    // Abreviatura: "ene-24", "ene.24", "ene 2024", "ENE-24"
+    const mAbrev = t.toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // quita tildes
+      .match(/^([A-Z]{3,4})[.\-\/\s]+(\d{2,4})$/);
+    if(mAbrev){
+      const abIdx = MESES_ABREV.indexOf(mAbrev[1].slice(0,3));
+      if(abIdx >= 0){
+        let year = parseInt(mAbrev[2], 10);
+        if(year < 100) year += 2000;
+        return new Date(year, abIdx, 1);
+      }
+    }
+
+    // Numérico: "01/2024", "1-2024"
+    const mNum = t.match(/^(\d{1,2})[\/\-](\d{4})$/);
+    if(mNum){
+      return new Date(parseInt(mNum[2],10), parseInt(mNum[1],10)-1, 1);
+    }
+
+    const d = new Date(t);
+    if(!isNaN(d)) return d;
+    return t;
   }
   return null;
 }
